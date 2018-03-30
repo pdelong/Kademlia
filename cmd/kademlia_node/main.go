@@ -16,7 +16,12 @@ func main() {
 	}
 
 	addr := args[0]
-	bootstrapAddr := args[1]
+
+	bootstrapAddr := ""
+
+	if len(args) >= 2 {
+		bootstrapAddr = args[1]
+	}
 
 	node := kademlia.NewNode(addr)
 
