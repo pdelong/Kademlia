@@ -61,10 +61,9 @@ type FindNodeArgs struct {
 type FindNodeReply struct {
 }
 
-func (self *Node) Ping(args PingArgs, reply *) error {
+func (self *Node) Ping(args PingArgs, reply *PingReply) error {
 	nodeEntry := NewNodeEntry(args.Source)
 	if nodeEntry == nil {
-
 	}
 	self.logger.Printf("Ping from %s", args.Source)
 	// TODO: Update k-bucket based on args.Source
