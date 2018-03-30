@@ -16,10 +16,11 @@ func main() {
 	}
 
 	addr := args[0]
-	//bootstrapAddr := args[1]
+	bootstrapAddr := args[1]
 
 	node := kademlia.NewNode(addr)
+
 	fmt.Println(node)
 
-	node.Run()
+	node.Run(bootstrapAddr)
 }
