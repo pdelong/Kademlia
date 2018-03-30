@@ -29,7 +29,7 @@ type Node struct {
 }
 
 type PingArgs struct {
-	Source NodeEntry
+	Source net.TCPAddr
 }
 
 type PingReply struct{}
@@ -61,9 +61,12 @@ type FindNodeArgs struct {
 type FindNodeReply struct {
 }
 
-func (self *Node) Ping(args PingArgs, reply *PingReply) error {
+func (self *Node) Ping(args PingArgs, reply *) error {
+	nodeEntry := NewNodeEntry(args.Source)
+	if nodeEntry == nil {
 
-	self.logger.Printf("Ping from %s", args.Source.Addr)
+	}
+	self.logger.Printf("Ping from %s", args.Source)
 	// TODO: Update k-bucket based on args.Source
 	return nil
 }
@@ -94,6 +97,16 @@ func (self *Node) distanceTo(other *NodeEntry) *big.Int {
 	return big.NewInt(0).Xor(&self.id, &other.Id)
 }
 
+func NewNodeEntry(addr net.TCPAddr) *NodeEntry {
+	hash := sha1.Sum([]byte(addr.String()))
+
+	id := *big.NewInt(0)
+	id.SetBytes(hash[:])
+
+	nodeEntry := NodeEntry{id, addr}
+	return &nodeEntry
+}
+
 func NewNode(address string) *Node {
 	node := new(Node)
 	addr, err := net.ResolveTCPAddr("tcp", address)
@@ -103,8 +116,7 @@ func NewNode(address string) *Node {
 
 	node.addr = *addr
 
-	// #eww
-	hash := sha1.Sum([]byte(fmt.Sprintf("%s", address)))
+	hash := sha1.Sum([]byte(addr.String()))
 
 	node.id = *big.NewInt(0)
 	node.id.SetBytes(hash[:])
@@ -149,8 +161,7 @@ func (self *Node) DoPing(dest net.TCPAddr) {
 		return
 	}
 
-	nodeEntry := NodeEntry{Id: self.id, Addr: self.addr}
-	args := PingArgs{nodeEntry}
+	args := PingArgs{self.addr}
 	var reply PingReply
 	err = client.Call("NodeRPC.Ping", args, &reply)
 	self.logger.Printf("DoPing called on %s", dest.String())
