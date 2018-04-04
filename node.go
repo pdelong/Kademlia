@@ -67,12 +67,8 @@ func (self *Node) Ping(args PingArgs, reply *PingReply) error {
 
 	self.logger.Printf("Ping from %s", args.Source.String())
 	// TODO: Update k-bucket based on args.Source
-<<<<<<< HEAD
 	self.rt.add(*contact)
-=======
-
 	*reply = PingReply{self.addr}
->>>>>>> da17d5ae62a5fc29dfd82169e2974fa8dd7e2b7c
 	return nil
 }
 
@@ -134,11 +130,10 @@ func NewNode(address string) *Node {
 
 	node.id = *big.NewInt(0)
 	node.id.SetBytes(hash[:])
-
-	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
-
 	// TODO: take in k and tRefresh arguments - for now just hardcoding default
 	node.rt = NewRoutingTable(node, 20, 3600)
+
+	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	return node
 }

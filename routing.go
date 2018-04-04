@@ -61,9 +61,8 @@ func (self *RoutingTable) add(contact Contact) {
 	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
 	if self.kBuckets[index] == nil {
 		self.kBuckets[index] = NewKBucket(20)
-	} else {
-		self.kBuckets[index].addContact(contact)
 	}
+	self.kBuckets[index].addContact(contact)
 	//TODO: handle failure to add
 }
 
