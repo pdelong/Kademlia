@@ -29,7 +29,9 @@ type PingArgs struct {
 	Source net.TCPAddr
 }
 
-type PingReply struct{}
+type PingReply struct {
+	Source net.TCPAddr
+}
 
 type StoreArgs struct {
 	Source net.TCPAddr
@@ -67,6 +69,8 @@ func (self *Node) Ping(args PingArgs, reply *PingReply) error {
 
 	self.logger.Printf("Ping from %s", args.Source.String())
 	// TODO: Update k-bucket based on args.Source
+
+	*reply = PingReply{self.addr}
 	return nil
 }
 
@@ -142,11 +146,12 @@ func (self *Node) Run(toPing string) {
 	toPingAddr, err := net.ResolveTCPAddr("", toPing)
 	//TODO: handle err
 	if err != nil {
-		log.Fatal(err)
+		self.logger.Printf("%s", err)
 	}
 
 	l, e := net.ListenTCP("tcp", &self.addr)
 	if e != nil {
+		log.Fatal(e)
 		return
 	}
 
@@ -187,6 +192,8 @@ func (self *Node) DoPing(dest net.TCPAddr) {
 	if !self.doRPC("Ping", dest, args, &reply) {
 		return
 	}
+
+	self.logger.Printf("Got ping reply from %s", reply.Source.String())
 
 	// TODO: Update K-Buckets
 }
