@@ -1,7 +1,6 @@
 package kademlia
 
 import (
-	"container/list"
 	"crypto/sha1"
 	"errors"
 	"fmt"
@@ -16,13 +15,11 @@ import (
 
 // Data structure for an individual Kademlia node
 type Node struct {
-	id       big.Int
-	addr     net.TCPAddr
-	ht       map[string][]byte
-	kBuckets []list.List // TODO: Might want array of arrays
-	// kBuckets should just be a slice(array?) of kbucket structs
+	id     big.Int
+	addr   net.TCPAddr
+	ht     map[string][]byte
+	rt     *RoutingTable
 	logger *log.Logger
-	// TODO: routing table
 }
 
 type PingArgs struct {
@@ -60,20 +57,22 @@ type FindNodeReply struct {
 
 // Handler for the PING RPC
 func (self *Node) Ping(args PingArgs, reply *PingReply) error {
-	nodeEntry := NewContact(args.Source)
-	if nodeEntry == nil {
+	contact := NewContact(args.Source)
+
+	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 
 	self.logger.Printf("Ping from %s", args.Source.String())
 	// TODO: Update k-bucket based on args.Source
+	self.rt.add(*contact)
 	return nil
 }
 
 // Handler for the STORE RPC
 func (self *Node) Store(args StoreArgs, reply *StoreReply) error {
-	nodeEntry := NewContact(args.Source)
-	if nodeEntry == nil {
+	contact := NewContact(args.Source)
+	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 
@@ -84,8 +83,8 @@ func (self *Node) Store(args StoreArgs, reply *StoreReply) error {
 
 // Handler for the FINDVALUE RPC
 func (self *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
-	nodeEntry := NewContact(args.Source)
-	if nodeEntry == nil {
+	contact := NewContact(args.Source)
+	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 
@@ -94,8 +93,8 @@ func (self *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 
 // Handler for the FINDNODE RPC
 func (self *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
-	nodeEntry := NewContact(args.Source)
-	if nodeEntry == nil {
+	contact := NewContact(args.Source)
+	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 
@@ -106,7 +105,7 @@ func (self *Node) String() string {
 	return fmt.Sprintf("Node: (id = %s) (address = %s) (kBuckets = %v)",
 		self.id.String(),
 		self.addr.String(),
-		self.kBuckets)
+		self.rt)
 }
 
 // Return XOR distance between self and other
@@ -130,6 +129,10 @@ func NewNode(address string) *Node {
 	node.id.SetBytes(hash[:])
 
 	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	// TODO: take in k and tRefresh arguments - for now just hardcoding default
+	node.rt = NewRoutingTable(node, 20, 3600)
+
 	return node
 }
 
