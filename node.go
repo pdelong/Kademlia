@@ -20,6 +20,7 @@ type Node struct {
 	ht     map[string][]byte
 	rt     *RoutingTable
 	logger *log.Logger
+	restC  chan CommandMessage
 }
 
 // PingArgs contains the arguments for the PING RPC
@@ -129,6 +130,7 @@ func NewNode(address string) *Node {
 	node := new(Node)
 	addr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
+		fmt.Println(err)
 		return nil
 	}
 
@@ -140,6 +142,7 @@ func NewNode(address string) *Node {
 	node.id.SetBytes(hash[:])
 	// TODO: take in k and tRefresh arguments - for now just hardcoding default
 	node.rt = NewRoutingTable(node, 20, 3600)
+	node.restC = make(chan CommandMessage)
 
 	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 
@@ -151,29 +154,57 @@ func (node *Node) Run(toPing string) {
 	nodeRPC := &NodeRPC{node}
 	rpc.Register(nodeRPC)
 	rpc.HandleHTTP()
+	node.setupControlEndpoints()
 
-	// if the node was passed a node to ping, otherwise
-	// don't bother
-	if toPing != "" {
-		toPingAddr, err := net.ResolveTCPAddr("", toPing)
-		//TODO: handle err
-		if err != nil {
-			node.logger.Printf("%s", err)
-		}
+	// Removed this from if statement. May need to put it back
+	toPingAddr, err := net.ResolveTCPAddr("", toPing)
+	//TODO: handle err
+	if err != nil {
+		node.logger.Printf("%s", err)
+	}
 
-		// periodically ping
-		ticker := time.NewTicker(1 * time.Second)
-		counter := 0
-		go func() {
-			for range ticker.C {
-				node.doPing(*toPingAddr)
-				counter++
-				if counter == 5 {
-					os.Exit(1)
+	ticker := time.NewTicker(1 * time.Second)
+	counter := 0
+
+	go func() {
+		for {
+			select {
+			case msg := <-node.restC:
+				switch msg.Command {
+				case "PING":
+					contact, ok := msg.Arg1.(Contact)
+					if !ok {
+						fmt.Printf("PING REST argument is not a Contact")
+					}
+
+					fmt.Printf("Performing PING for IP: %s (ID: %s)\n",
+						contact.Addr.String(),
+						contact.Id.String())
+				case "STORE":
+					key := msg.Arg1
+					value := msg.Arg2
+					fmt.Printf("Performing STORE of key: %s, value: %s\n", key, value)
+				case "FINDNODE":
+					id := msg.Arg1
+					fmt.Printf("Performing FINDNODE of server id: %s\n", id)
+				case "FINDVALUE":
+					key := msg.Arg1
+					fmt.Printf("Performing FINDVALUE of key: %s\n", key)
+				case "SHUTDOWN":
+					fmt.Println("Shutting down...")
+					os.Exit(0)
+				}
+			case <-ticker.C:
+				if toPing != "" {
+					node.doPing(*toPingAddr)
+					counter++
+					if counter == 5 {
+						os.Exit(1)
+					}
 				}
 			}
-		}()
-	}
+		}
+	}()
 
 	// open our own port for connection
 	l, e := net.ListenTCP("tcp", &node.addr)
