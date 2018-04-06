@@ -144,25 +144,31 @@ func (self *Node) Run(toPing string) {
 	rpc.Register(nodeRPC)
 	rpc.HandleHTTP()
 
-	toPingAddr, err := net.ResolveTCPAddr("", toPing)
-	//TODO: handle err
-	if err != nil {
-		self.logger.Printf("%s", err)
+	// if the node was passed a node to ping, otherwise
+	// don't bother
+	if toPing != "" {
+		toPingAddr, err := net.ResolveTCPAddr("", toPing)
+		//TODO: handle err
+		if err != nil {
+			self.logger.Printf("%s", err)
+		}
+
+		// periodically ping
+		ticker := time.NewTicker(1 * time.Second)
+		go func() {
+			for range ticker.C {
+				self.DoPing(*toPingAddr)
+			}
+		}()
 	}
 
+	// open our own port for connection
 	l, e := net.ListenTCP("tcp", &self.addr)
 	if e != nil {
 		log.Fatal(e)
 		return
 	}
 
-	// periodically ping
-	ticker := time.NewTicker(1 * time.Second)
-	go func() {
-		for range ticker.C {
-			self.DoPing(*toPingAddr)
-		}
-	}()
 	http.Serve(l, nil)
 }
 
