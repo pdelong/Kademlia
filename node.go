@@ -155,9 +155,14 @@ func (self *Node) Run(toPing string) {
 
 		// periodically ping
 		ticker := time.NewTicker(1 * time.Second)
+        counter := 0
 		go func() {
 			for range ticker.C {
 				self.DoPing(*toPingAddr)
+                counter++
+                if (counter == 5) {
+                    os.Exit(1)
+                }
 			}
 		}()
 	}
