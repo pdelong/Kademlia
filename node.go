@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Data structure for an individual Kademlia node
+// Node is an individual Kademlia node
 type Node struct {
 	id     big.Int
 	addr   net.TCPAddr
@@ -22,70 +22,78 @@ type Node struct {
 	logger *log.Logger
 }
 
+// PingArgs contains the arguments for the PING RPC
 type PingArgs struct {
 	Source net.TCPAddr
 }
 
+// PingReply contains the results for the PING RPC
 type PingReply struct {
 	Source net.TCPAddr
 }
 
+// StoreArgs contains the arguments for the STORE RPC
 type StoreArgs struct {
 	Source net.TCPAddr
 	Key    string
 	Val    []byte
 }
 
+// StoreReply contains the results for the Store RPC
 type StoreReply struct {
 }
 
+// FindValueArgs contains the arguments for the FINDVALUE RPC
 type FindValueArgs struct {
 	Source net.TCPAddr
 	Key    string
 }
 
+// FindValueReply contains the results for the FINDVALUE RPC
 type FindValueReply struct {
 	Val  []byte
 	Node Contact
 }
 
+// FindNodeArgs contains the arguments for the FINDNODE RPC
 type FindNodeArgs struct {
 	Source net.TCPAddr
 	Key    string
 }
 
+// FindNodeReply contains the results for the FINDNODE RPC
 type FindNodeReply struct {
 }
 
-// Handler for the PING RPC
-func (self *Node) Ping(args PingArgs, reply *PingReply) error {
+// Ping is the handler for the PING RPC
+func (node *Node) Ping(args PingArgs, reply *PingReply) error {
 	contact := NewContact(args.Source)
 
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 
-	self.logger.Printf("Ping from %s", args.Source.String())
+	node.logger.Printf("Ping from %s", args.Source.String())
 	// TODO: Update k-bucket based on args.Source
-	self.rt.add(*contact)
-	*reply = PingReply{self.addr}
+	node.rt.add(*contact)
+	*reply = PingReply{node.addr}
 	return nil
 }
 
-// Handler for the STORE RPC
-func (self *Node) Store(args StoreArgs, reply *StoreReply) error {
+// Store is the handler for the STORE RPC
+func (node *Node) Store(args StoreArgs, reply *StoreReply) error {
 	contact := NewContact(args.Source)
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 
-	self.ht[args.Key] = args.Val
+	node.ht[args.Key] = args.Val
 	// TODO: update kbuckets/ reply?
 	return nil
 }
 
-// Handler for the FINDVALUE RPC
-func (self *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
+// FindValue is the handler for the FINDVALUE RPC
+func (node *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 	contact := NewContact(args.Source)
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
@@ -94,8 +102,8 @@ func (self *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 	return nil
 }
 
-// Handler for the FINDNODE RPC
-func (self *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
+// FindNode is the handler for the FINDNODE RPC
+func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	contact := NewContact(args.Source)
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
@@ -104,19 +112,19 @@ func (self *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	return nil
 }
 
-func (self *Node) String() string {
+func (node *Node) String() string {
 	return fmt.Sprintf("Node: (id = %s) (address = %s) (kBuckets = %v)",
-		self.id.String(),
-		self.addr.String(),
-		self.rt)
+		node.id.String(),
+		node.addr.String(),
+		node.rt)
 }
 
-// Return XOR distance between self and other
-func (self *Node) distanceTo(other *Contact) *big.Int {
-	return big.NewInt(0).Xor(&self.id, &other.Id)
+// Return XOR distance between node and other
+func (node *Node) distanceTo(other *Contact) *big.Int {
+	return big.NewInt(0).Xor(&node.id, &other.Id)
 }
 
-// Construct a new Node struct
+// NewNode returns a new Node struct
 func NewNode(address string) *Node {
 	node := new(Node)
 	addr, err := net.ResolveTCPAddr("tcp", address)
@@ -138,9 +146,9 @@ func NewNode(address string) *Node {
 	return node
 }
 
-// Called on an initialized Node to begin serving the RPC endpoints
-func (self *Node) Run(toPing string) {
-	nodeRPC := &NodeRPC{self}
+// Run is called on an initialized Node to begin serving the RPC endpoints
+func (node *Node) Run(toPing string) {
+	nodeRPC := &NodeRPC{node}
 	rpc.Register(nodeRPC)
 	rpc.HandleHTTP()
 
@@ -150,25 +158,25 @@ func (self *Node) Run(toPing string) {
 		toPingAddr, err := net.ResolveTCPAddr("", toPing)
 		//TODO: handle err
 		if err != nil {
-			self.logger.Printf("%s", err)
+			node.logger.Printf("%s", err)
 		}
 
 		// periodically ping
 		ticker := time.NewTicker(1 * time.Second)
-        counter := 0
+		counter := 0
 		go func() {
 			for range ticker.C {
-				self.DoPing(*toPingAddr)
-                counter++
-                if (counter == 5) {
-                    os.Exit(1)
-                }
+				node.doPing(*toPingAddr)
+				counter++
+				if counter == 5 {
+					os.Exit(1)
+				}
 			}
 		}()
 	}
 
 	// open our own port for connection
-	l, e := net.ListenTCP("tcp", &self.addr)
+	l, e := net.ListenTCP("tcp", &node.addr)
 	if e != nil {
 		log.Fatal(e)
 		return
@@ -178,18 +186,18 @@ func (self *Node) Run(toPing string) {
 }
 
 // Perform the legwork of RPC invocation
-func (self *Node) doRPC(method string, dest net.TCPAddr, args interface{}, reply interface{}) bool {
-	self.logger.Printf("Sending %s RPC to %s", method, dest.String())
+func (node *Node) doRPC(method string, dest net.TCPAddr, args interface{}, reply interface{}) bool {
+	node.logger.Printf("Sending %s RPC to %s", method, dest.String())
 
 	client, err := rpc.DialHTTP("tcp", dest.String())
 	if err != nil {
-		self.logger.Printf("Dial to %s failed: %s", dest.String(), err)
+		node.logger.Printf("Dial to %s failed: %s", dest.String(), err)
 		return false
 	}
 
 	err = client.Call(fmt.Sprintf("NodeRPC.%s", method), args, reply)
 	if err != nil {
-		self.logger.Printf("%s RPC to %s failed: %s", method, dest, err)
+		node.logger.Printf("%s RPC to %s failed: %s", method, dest.String(), err)
 		return false
 	}
 
@@ -197,25 +205,25 @@ func (self *Node) doRPC(method string, dest net.TCPAddr, args interface{}, reply
 }
 
 // Send a PING RPC to dest
-func (self *Node) DoPing(dest net.TCPAddr) {
-	args := PingArgs{self.addr}
+func (node *Node) doPing(dest net.TCPAddr) {
+	args := PingArgs{node.addr}
 	var reply PingReply
 
-	if !self.doRPC("Ping", dest, args, &reply) {
+	if !node.doRPC("Ping", dest, args, &reply) {
 		return
 	}
 
-	self.logger.Printf("Got ping reply from %s", reply.Source.String())
+	node.logger.Printf("Got ping reply from %s", reply.Source.String())
 
 	// TODO: Update K-Buckets
 }
 
 // Send a STORE RPC for (key, value) to dest
-func (self *Node) DoStore(key string, value []byte, dest net.TCPAddr) {
-	args := StoreArgs{self.addr, key, value}
+func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
+	args := StoreArgs{node.addr, key, value}
 	var reply StoreReply
 
-	if !self.doRPC("Store", dest, args, &reply) {
+	if !node.doRPC("Store", dest, args, &reply) {
 		return
 	}
 
@@ -224,11 +232,11 @@ func (self *Node) DoStore(key string, value []byte, dest net.TCPAddr) {
 }
 
 // Send a FINDVALUE RPC for key to dest
-func (self *Node) DoFindValue(key string, dest net.TCPAddr) {
-	args := FindValueArgs{self.addr, key}
+func (node *Node) doFindValue(key string, dest net.TCPAddr) {
+	args := FindValueArgs{node.addr, key}
 	var reply FindNodeReply
 
-	if !self.doRPC("FindValue", dest, args, &reply) {
+	if !node.doRPC("FindValue", dest, args, &reply) {
 		return
 	}
 
@@ -237,11 +245,11 @@ func (self *Node) DoFindValue(key string, dest net.TCPAddr) {
 }
 
 // Send a FINDNODE RPC for key to dest
-func (self *Node) DoFindNode(key string, dest net.TCPAddr) {
-	args := FindNodeArgs{self.addr, key}
+func (node *Node) doFindNode(key string, dest net.TCPAddr) {
+	args := FindNodeArgs{node.addr, key}
 	var reply FindNodeReply
 
-	if !self.doRPC("FindNode", dest, args, &reply) {
+	if !node.doRPC("FindNode", dest, args, &reply) {
 		return
 	}
 
