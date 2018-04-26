@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 	"net"
+	"sort"
 )
 
 // TODO: The naming conventions are atrocious
@@ -34,26 +35,68 @@ func AreEqualContacts(a *Contact, b *Contact) bool {
 
 // extra struct because we will want to implement split bucket
 type RoutingTable struct {
-	owner    *Node
-	kBuckets []*KBucket
-	k        int
-	tRefresh int
+	owner        *Node
+	kBuckets     []*KBucket
+	k            int
+	numNeighbors int
+	tRefresh     int
 }
 
 func NewRoutingTable(owner *Node, k int, tRefresh int) *RoutingTable {
 	kBuckets := make([]*KBucket, 160, 160)
-	rt := RoutingTable{owner, kBuckets, k, tRefresh}
+	numNeighbors := 0
+	rt := RoutingTable{owner, kBuckets, k, numNeighbors, tRefresh}
 	return &rt
 }
 
 // section 2.4 Kademlia protocol splits bucket when full and range includes own ID
 // TODO
 func (self *RoutingTable) splitBucket() {
+
 }
 
-//TODO
-func (self *RoutingTable) findContact() {
+// Not described in Kademlia paper, seems like various implementations choose arbitrarily
+// A nontrivial number of implementations also just decided to get rid of kbuckets (they have marginal better lookup times)
+func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
+	// If the entire RT has less than k contacts, then just return all the contacts
 
+	kNearest := make([]Contact, self.k)
+	// To find the k closest contacts, we start looking from the bucket that the contact would be in
+	dist := float64(distanceBetween(id, self.owner.id).Uint64())
+	index := int(math.Ceil(math.Log(dist) / math.Log(2)))
+	copy(kNearest, self.kBuckets[index].getAllContacts())
+
+	// If less than k contacts are in the bucket, then take the closest from the left
+	if len(kNearest) < self.k {
+		// 0th bucket never populated
+		for curr := index - 1; curr > 0; index-- {
+			currBucket := self.kBuckets[curr]
+			kNearest = append(kNearest, currBucket.getAllContacts()...)
+			if len(kNearest) >= self.k {
+				break
+			}
+		}
+	}
+
+	// Then go to the right
+	if len(kNearest) < self.k {
+		for curr := index + 1; curr < len(self.kBuckets); curr++ {
+			currBucket := self.kBuckets[curr]
+			kNearest = append(kNearest, currBucket.getAllContacts()...)
+			if len(kNearest) >= self.k {
+				break
+			}
+		}
+	}
+
+	kNearest = kNearest[:self.k]
+	sort.Slice(kNearest, func(i, j int) bool {
+		aDist := float64(distanceBetween(id, kNearest[i].Id).Uint64())
+		bDist := float64(distanceBetween(id, kNearest[j].Id).Uint64())
+		return aDist < bDist
+	})
+
+	return kNearest
 }
 
 func (self *RoutingTable) add(contact Contact) {
@@ -68,6 +111,7 @@ func (self *RoutingTable) add(contact Contact) {
 
 func (self *RoutingTable) remove(contact Contact) {
 	dist := float64(self.owner.distanceTo(&contact).Uint64())
+	// This calculation finds the smallest number of bits needed to express the dist
 	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
 	self.kBuckets[index].removeContact(contact)
 }
@@ -101,6 +145,18 @@ func (self *KBucket) getFromList(contact Contact) *list.Element {
 		}
 	}
 	return nil
+}
+
+// Not nice, but need this functionality because contacts are a list
+func (self *KBucket) getAllContacts() []Contact {
+	contacts := make([]Contact, 20)
+	index := 0
+	for e := self.contacts.Front(); e != nil; e = e.Next() {
+		curr, _ := e.Value.(Contact)
+		contacts[index] = curr
+		index++
+	}
+	return contacts
 }
 
 // Returns true if contact is added into bucket, false otherwise
