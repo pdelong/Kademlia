@@ -110,6 +110,18 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 		return errors.New("Couldn't hash IP address")
 	}
 
+	// After asking 20 nodes, should return with closest
+	contacted := make([]Contact, 0, 20)
+
+	shortlist := make([]Contact, 0, 20)
+	shortlist = node.rt.findKNearestContacts(key)
+
+	// this should never be nil but I bet it is.
+	closest := shortlist[0]
+
+	for {
+	}
+
 	return nil
 }
 
@@ -123,6 +135,10 @@ func (node *Node) String() string {
 // Return XOR distance between node and other
 func (node *Node) distanceTo(other *Contact) *big.Int {
 	return big.NewInt(0).Xor(&node.id, &other.Id)
+}
+
+func distanceBetween(firstId big.Int, secondId big.Int) *big.Int {
+	return big.NewInt(0).Xor(&firstId, &secondId)
 }
 
 // NewNode returns a new Node struct
@@ -141,7 +157,7 @@ func NewNode(address string) *Node {
 	node.id = *big.NewInt(0)
 	node.id.SetBytes(hash[:])
 	// TODO: take in k and tRefresh arguments - for now just hardcoding default
-	node.rt = NewRoutingTable(node, 20, 3600)
+	node.rt = NewRoutingTable(node)
 	node.restC = make(chan CommandMessage)
 
 	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)

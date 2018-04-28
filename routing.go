@@ -37,15 +37,13 @@ func AreEqualContacts(a *Contact, b *Contact) bool {
 type RoutingTable struct {
 	owner        *Node
 	kBuckets     []*KBucket
-	k            int
 	numNeighbors int
-	tRefresh     int
 }
 
-func NewRoutingTable(owner *Node, k int, tRefresh int) *RoutingTable {
+func NewRoutingTable(owner *Node) *RoutingTable {
 	kBuckets := make([]*KBucket, 160, 160)
 	numNeighbors := 0
-	rt := RoutingTable{owner, kBuckets, k, numNeighbors, tRefresh}
+	rt := RoutingTable{owner, kBuckets, numNeighbors}
 	return &rt
 }
 
@@ -60,36 +58,37 @@ func (self *RoutingTable) splitBucket() {
 func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	// If the entire RT has less than k contacts, then just return all the contacts
 
-	kNearest := make([]Contact, self.k)
+	kNearest := make([]Contact, k)
 	// To find the k closest contacts, we start looking from the bucket that the contact would be in
 	dist := float64(distanceBetween(id, self.owner.id).Uint64())
 	index := int(math.Ceil(math.Log(dist) / math.Log(2)))
 	copy(kNearest, self.kBuckets[index].getAllContacts())
 
 	// If less than k contacts are in the bucket, then take the closest from the left
-	if len(kNearest) < self.k {
+	if len(kNearest) < k {
 		// 0th bucket never populated
 		for curr := index - 1; curr > 0; index-- {
 			currBucket := self.kBuckets[curr]
 			kNearest = append(kNearest, currBucket.getAllContacts()...)
-			if len(kNearest) >= self.k {
+			if len(kNearest) >= k {
 				break
 			}
 		}
 	}
 
 	// Then go to the right
-	if len(kNearest) < self.k {
+	if len(kNearest) < k {
 		for curr := index + 1; curr < len(self.kBuckets); curr++ {
 			currBucket := self.kBuckets[curr]
 			kNearest = append(kNearest, currBucket.getAllContacts()...)
-			if len(kNearest) >= self.k {
+			if len(kNearest) >= k {
 				break
 			}
 		}
 	}
 
-	kNearest = kNearest[:self.k]
+	// Return in order of distance to contact
+	kNearest = kNearest[:k]
 	sort.Slice(kNearest, func(i, j int) bool {
 		aDist := float64(distanceBetween(id, kNearest[i].Id).Uint64())
 		bDist := float64(distanceBetween(id, kNearest[j].Id).Uint64())
@@ -106,6 +105,7 @@ func (self *RoutingTable) add(contact Contact) {
 		self.kBuckets[index] = NewKBucket(20)
 	}
 	self.kBuckets[index].addContact(contact)
+	self.numNeighbors++
 	//TODO: handle failure to add
 }
 
@@ -114,6 +114,7 @@ func (self *RoutingTable) remove(contact Contact) {
 	// This calculation finds the smallest number of bits needed to express the dist
 	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
 	self.kBuckets[index].removeContact(contact)
+	self.numNeighbors--
 }
 
 // Not even sure if we will use this
@@ -169,7 +170,7 @@ func (self *KBucket) addContact(contact Contact) bool {
 	} else {
 		// If bucket isn't full, add to tail
 		// list.Len() = O(1)
-		if self.contacts.Len() < self.k {
+		if self.contacts.Len() < k {
 			self.contacts.PushBack(contact)
 			return true
 		}
