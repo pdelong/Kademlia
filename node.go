@@ -264,8 +264,6 @@ func (node *Node) doPing(dest net.TCPAddr) {
 	}
 
 	node.logger.Printf("Got ping reply from %s", reply.Source.String())
-
-	// TODO: Update K-Buckets
 }
 
 // Send a STORE RPC for (key, value) to dest
@@ -279,25 +277,35 @@ func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 }
 
 // Send a FINDVALUE RPC for key to dest
-func (node *Node) doFindValue(key string, dest net.TCPAddr) {
+func (node *Node) doFindValue(key string, dest net.TCPAddr) []byte {
 	args := FindValueArgs{node.addr, key}
-	var reply FindNodeReply
+	var reply FindValueReply
 
 	if !node.doRPC("FindValue", dest, args, &reply) {
-		return
+		return nil
 	}
 
-	// TODO: Whatever processing we need to perform afterwards
-	// TODO: Update K-Buckets
+	// Update K-Buckets
+	for _, contact := range reply.Contacts {
+		node.rt.add(contact)
+	}
+
+	return reply.Val
+
 }
 
 // Send a FINDNODE RPC for key to dest
-func (node *Node) doFindNode(dest net.TCPAddr) {
+func (node *Node) doFindNode(dest net.TCPAddr) []Contact {
 	args := FindNodeArgs{node.addr}
 	var reply FindNodeReply
 	if !node.doRPC("FindNode", dest, args, &reply) {
-		return
+		return nil
 	}
-	// TODO: Whatever processing we need to perform afterwards
-	// TODO: Update K-Buckets
+
+	// Update K-Buckets
+	for _, contact := range reply.Contacts {
+		node.rt.add(contact)
+	}
+
+	return reply.Contacts
 }
