@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"sort"
+	"sync"
 )
 
 // TODO: The naming conventions are atrocious
@@ -38,12 +39,14 @@ type RoutingTable struct {
 	owner        *Node
 	kBuckets     []*KBucket
 	numNeighbors int
+	mu           *sync.Mutex
 }
 
 func NewRoutingTable(owner *Node) *RoutingTable {
 	kBuckets := make([]*KBucket, 160, 160)
 	numNeighbors := 0
-	rt := RoutingTable{owner, kBuckets, numNeighbors}
+	mu := &sync.Mutex{}
+	rt := RoutingTable{owner, kBuckets, numNeighbors, mu}
 	return &rt
 }
 
@@ -53,8 +56,6 @@ func (self *RoutingTable) splitBucket() {
 
 }
 
-// Not described in Kademlia paper, seems like various implementations choose arbitrarily
-// A nontrivial number of implementations also just decided to get rid of kbuckets (they have marginal better lookup times)
 func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	// If the entire RT has less than k contacts, then just return all the contacts
 

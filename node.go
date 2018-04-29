@@ -52,18 +52,19 @@ type FindValueArgs struct {
 
 // FindValueReply contains the results for the FINDVALUE RPC
 type FindValueReply struct {
-	Val  []byte
-	Node Contact
+	Val      []byte
+	Contacts []Contact
 }
 
 // FindNodeArgs contains the arguments for the FINDNODE RPC
 type FindNodeArgs struct {
 	Source net.TCPAddr
-	Key    string
+	//Key    string
 }
 
 // FindNodeReply contains the results for the FINDNODE RPC
 type FindNodeReply struct {
+	Contacts []Contact
 }
 
 // Ping is the handler for the PING RPC
@@ -73,10 +74,11 @@ func (node *Node) Ping(args PingArgs, reply *PingReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
 
 	node.logger.Printf("Ping from %s", args.Source.String())
-	// TODO: Update k-bucket based on args.Source
-	node.rt.add(*contact)
+
+	// Update k-bucket based on args.Source
 	*reply = PingReply{node.addr}
 	return nil
 }
@@ -87,9 +89,10 @@ func (node *Node) Store(args StoreArgs, reply *StoreReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
 
 	node.ht[args.Key] = args.Val
-	// TODO: update kbuckets/ reply?
+	*reply = StoreReply{}
 	return nil
 }
 
@@ -99,7 +102,16 @@ func (node *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
+	// If node contains key, returns associated data
+	if val, ok := node.ht[args.Key]; ok {
+		*reply = FindValueReply{Val: val}
+		return nil
+	}
 
+	// Otherwise, return set of k triples (equiv. to FindNode)
+	kNearest := node.rt.findKNearestContacts(contact.Id)
+	*reply = FindValueReply{Contacts: kNearest}
 	return nil
 }
 
@@ -109,19 +121,10 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
 
-	// After asking 20 nodes, should return with closest
-	contacted := make([]Contact, 0, 20)
-
-	shortlist := make([]Contact, 0, 20)
-	shortlist = node.rt.findKNearestContacts(key)
-
-	// this should never be nil but I bet it is.
-	closest := shortlist[0]
-
-	for {
-	}
-
+	kNearest := node.rt.findKNearestContacts(contact.Id)
+	*reply = FindNodeReply{Contacts: kNearest}
 	return nil
 }
 
@@ -273,9 +276,6 @@ func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 	if !node.doRPC("Store", dest, args, &reply) {
 		return
 	}
-
-	// TODO: Whatever processing we need to perform afterwards
-	// TODO: Update K-Buckets
 }
 
 // Send a FINDVALUE RPC for key to dest
@@ -292,14 +292,12 @@ func (node *Node) doFindValue(key string, dest net.TCPAddr) {
 }
 
 // Send a FINDNODE RPC for key to dest
-func (node *Node) doFindNode(key string, dest net.TCPAddr) {
-	args := FindNodeArgs{node.addr, key}
+func (node *Node) doFindNode(dest net.TCPAddr) {
+	args := FindNodeArgs{node.addr}
 	var reply FindNodeReply
-
 	if !node.doRPC("FindNode", dest, args, &reply) {
 		return
 	}
-
 	// TODO: Whatever processing we need to perform afterwards
 	// TODO: Update K-Buckets
 }
