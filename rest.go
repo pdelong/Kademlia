@@ -77,12 +77,12 @@ func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Called PING (ID) for server %s", id)
 }
 
-func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
+func (node *Node) handleOneshotStore(w http.ResponseWriter, r *http.Request) {
 	if !checkMethod([]string{"POST"}, r, w) {
 		return
 	}
 
-	key := r.URL.Path[len("/store/"):]
+	key := r.URL.Path[len("/oneshot/store/"):]
 	value, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		fmt.Fprintf(w, "Error reading value")
@@ -97,12 +97,12 @@ func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
 }
 
-func (node *Node) handleFindNode(w http.ResponseWriter, r *http.Request) {
+func (node *Node) handleOneshotFindNode(w http.ResponseWriter, r *http.Request) {
 	if !checkMethod([]string{"GET"}, r, w) {
 		return
 	}
 
-	id := r.URL.Path[len("/findnode/"):]
+	id := r.URL.Path[len("/oneshot/findnode/"):]
 
 	// TODO: Check for valid id
 	// TODO: Get response
@@ -113,12 +113,64 @@ func (node *Node) handleFindNode(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
 }
 
-func (node *Node) handleFindValue(w http.ResponseWriter, r *http.Request) {
+func (node *Node) handleOneshotFindValue(w http.ResponseWriter, r *http.Request) {
 	if !checkMethod([]string{"GET"}, r, w) {
 		return
 	}
 
-	key := r.URL.Path[len("/findvalue/"):]
+	key := r.URL.Path[len("/oneshot/findvalue/"):]
+
+	// TODO: Check for valid key
+	// TODO: Get response
+
+	c := make(chan interface{})
+	node.restC <- CommandMessage{"FINDVALUE", key, nil, c}
+
+	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
+}
+
+func (node *Node) handleIterativeStore(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"POST"}, r, w) {
+		return
+	}
+
+	key := r.URL.Path[len("/iterative/store/"):]
+	value, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprintf(w, "Error reading value")
+	}
+
+	c := make(chan interface{})
+	node.restC <- CommandMessage{"STORE", key, value, c}
+
+	<-c
+
+	// TODO: Send back response
+	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
+}
+
+func (node *Node) handleIterativeFindNode(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"GET"}, r, w) {
+		return
+	}
+
+	id := r.URL.Path[len("/iterative/findnode/"):]
+
+	// TODO: Check for valid id
+	// TODO: Get response
+
+	c := make(chan interface{})
+	node.restC <- CommandMessage{"FINDNODE", id, nil, c}
+
+	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
+}
+
+func (node *Node) handleIterativeFindValue(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"GET"}, r, w) {
+		return
+	}
+
+	key := r.URL.Path[len("/iterative/findvalue/"):]
 
 	// TODO: Check for valid key
 	// TODO: Get response
@@ -157,23 +209,42 @@ func (node *Node) setupControlEndpoints() {
 		node.handlePingID(w, r)
 	})
 
-	// Handle request to store (key,value) in the DHT
+	// Handle oneshot request to store (key,value) in the DHT
 	// POST /store/<key hash>
 	// Body is raw value
-	http.HandleFunc("/store/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleStore(w, r)
+	http.HandleFunc("/oneshot/store/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleOneshotStore(w, r)
 	})
 
-	// Handle request to find node with specific node id
+	// Handle oneshot request to find node with specific node id
 	// GET /find/<id>
-	http.HandleFunc("/findnode/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleFindNode(w, r)
+	http.HandleFunc("/oneshot/findnode/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleOneshotFindNode(w, r)
 	})
 
-	// Handle request to find specific value
+	// Handle oneshot request to find specific value
 	// GET /findvalue/<key hash>
-	http.HandleFunc("/findvalue/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleFindValue(w, r)
+	http.HandleFunc("/oneshot/findvalue/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleOneshotFindValue(w, r)
+	})
+
+	// Handle iterative request to store (key,value) in the DHT
+	// POST /store/<key hash>
+	// Body is raw value
+	http.HandleFunc("/iterative/store/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleIterativeStore(w, r)
+	})
+
+	// Handle iterative request to find node with specific node id
+	// GET /find/<id>
+	http.HandleFunc("/iterative/findnode/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleIterativeFindNode(w, r)
+	})
+
+	// Handle iterative request to find specific value
+	// GET /findvalue/<key hash>
+	http.HandleFunc("/iterative/findvalue/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleIterativeFindValue(w, r)
 	})
 
 	// Handle request to shutdown server
