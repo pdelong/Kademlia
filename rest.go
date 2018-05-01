@@ -33,9 +33,12 @@ func (node *Node) handlePingIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Perform the necessary stuff
-	// TODO: Send back response
-	fmt.Fprintf(w, "REST: Received PING (IP) for server %s", addr.String())
+	node.doPing(*addr)
+
+	// TODO: Return diagnostic information from doPing
+	// TODO: Logging
+
+	fmt.Fprintf(w, "Sent PING (IP) to %s", addr.String())
 }
 
 func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
@@ -52,24 +55,35 @@ func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: See if id in kbuckets, else return error
-	// TODO: Perform necessary stuff
-	// TODO: Send back response
-	fmt.Fprintf(w, "Called PING (ID) for server %s", id)
+	contact := node.rt.ContactFromID(*id)
+	if contact == nil {
+		fmt.Fprintf(w, "Could not find %s in routing table", id.String())
+		return
+	}
+
+	addr := contact.Addr
+
+	node.doPing(addr)
+
+	// TODO: Return diagnostic information from doPing
+	// TODO: Logging
+
+	fmt.Fprintf(w, "Sent PING (ID) to server %s", addr.String())
 }
 
-func (node *Node) handleOneshotStore(w http.ResponseWriter, r *http.Request) {
+func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 	if !checkMethod([]string{"POST"}, r, w) {
 		return
 	}
 
-	key := r.URL.Path[len("/oneshot/store/"):]
+	key := r.URL.Path[len("/store/"):]
 	value, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		fmt.Fprintf(w, "Error reading value")
 	}
 
-	// TODO: Perform necessary stuff
+	// TODO: Store the key
+	// TODO: Mark this node as the originator
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
 }
@@ -79,7 +93,7 @@ func (node *Node) handleOneshotFindNode(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id := r.URL.Path[len("/oneshot/findnode/"):]
+	id := r.URL.Path[len("/iterative/findnode/"):]
 
 	// TODO: Check for valid id
 	// TODO: Perform necessary stuff
@@ -98,22 +112,6 @@ func (node *Node) handleOneshotFindValue(w http.ResponseWriter, r *http.Request)
 	// TODO: Perform necessary stuff
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
-}
-
-func (node *Node) handleIterativeStore(w http.ResponseWriter, r *http.Request) {
-	if !checkMethod([]string{"POST"}, r, w) {
-		return
-	}
-
-	key := r.URL.Path[len("/iterative/store/"):]
-	value, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprintf(w, "Error reading value")
-	}
-
-	// TODO: Perform necessary stuff
-	// TODO: Send back response
-	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
 }
 
 func (node *Node) handleIterativeFindNode(w http.ResponseWriter, r *http.Request) {
@@ -170,11 +168,12 @@ func (node *Node) setupControlEndpoints() {
 		node.handlePingID(w, r)
 	})
 
-	// Handle oneshot request to store (key,value) in the DHT
+	// Handle request to store (key,value) in the DHT
+	// This node becomes the originator
 	// POST /store/<key hash>
 	// Body is raw value
-	http.HandleFunc("/oneshot/store/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleOneshotStore(w, r)
+	http.HandleFunc("/store/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleStore(w, r)
 	})
 
 	// Handle oneshot request to find node with specific node id
@@ -187,13 +186,6 @@ func (node *Node) setupControlEndpoints() {
 	// GET /findvalue/<key hash>
 	http.HandleFunc("/oneshot/findvalue/", func(w http.ResponseWriter, r *http.Request) {
 		node.handleOneshotFindValue(w, r)
-	})
-
-	// Handle iterative request to store (key,value) in the DHT
-	// POST /store/<key hash>
-	// Body is raw value
-	http.HandleFunc("/iterative/store/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleIterativeStore(w, r)
 	})
 
 	// Handle iterative request to find node with specific node id

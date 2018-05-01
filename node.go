@@ -207,6 +207,7 @@ func (node *Node) doRPC(method string, dest net.TCPAddr, args interface{}, reply
 }
 
 // Send a PING RPC to dest
+// TODO: Return diagnostic information
 func (node *Node) doPing(dest net.TCPAddr) {
 	args := PingArgs{node.addr}
 	var reply PingReply
@@ -221,6 +222,7 @@ func (node *Node) doPing(dest net.TCPAddr) {
 }
 
 // Send a STORE RPC for (key, value) to dest
+// TODO: Return diagnostic information
 func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 	args := StoreArgs{node.addr, key, value}
 	var reply StoreReply
@@ -234,6 +236,7 @@ func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 }
 
 // Send a FINDVALUE RPC for key to dest
+// TODO: Return diagnostic information
 func (node *Node) doFindValue(key string, dest net.TCPAddr) {
 	args := FindValueArgs{node.addr, key}
 	var reply FindNodeReply
@@ -247,6 +250,7 @@ func (node *Node) doFindValue(key string, dest net.TCPAddr) {
 }
 
 // Send a FINDNODE RPC for key to dest
+// TODO: Return diagnostic information
 func (node *Node) doFindNode(key string, dest net.TCPAddr) {
 	args := FindNodeArgs{node.addr, key}
 	var reply FindNodeReply

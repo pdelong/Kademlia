@@ -56,6 +56,23 @@ func (self *RoutingTable) findContact() {
 
 }
 
+// ContactFromID returns the contact that belongs to id if it exists and nil if
+// it doesn't
+func (table *RoutingTable) ContactFromID(id big.Int) *Contact {
+	contact := Contact{id, net.TCPAddr{}}
+
+	for _, bucket := range table.kBuckets {
+		result := bucket.getFromList(contact)
+		if result != nil {
+			// TODO: Handle case where cannot cast
+			toReturn := result.Value.(Contact)
+			return &toReturn
+		}
+	}
+
+	return nil
+}
+
 func (self *RoutingTable) add(contact Contact) {
 	dist := float64(self.owner.distanceTo(&contact).Uint64())
 	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
