@@ -10,7 +10,6 @@ import (
 	"sync"
 )
 
-// TODO: The naming conventions are atrocious
 // An entry in the k-bucket
 type Contact struct {
 	Id   big.Int
