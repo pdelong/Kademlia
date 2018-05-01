@@ -9,14 +9,6 @@ import (
 	"strings"
 )
 
-// CommandMessage is a container for messages sent from the REST api to the node
-type CommandMessage struct {
-	Command string
-	Arg1    interface{}
-	Arg2    interface{}
-	Resp    chan interface{} //TODO: There might be a better option. string?
-}
-
 func checkMethod(methods []string, request *http.Request, w http.ResponseWriter) bool {
 	for _, method := range methods {
 		if method == request.Method {
@@ -41,13 +33,7 @@ func (node *Node) handlePingIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contact := NewContact(*addr)
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"PING", contact, nil, c}
-
-	<-c
-
+	// TODO: Perform the necessary stuff
 	// TODO: Send back response
 	fmt.Fprintf(w, "REST: Received PING (IP) for server %s", addr.String())
 }
@@ -67,12 +53,7 @@ func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: See if id in kbuckets, else return error
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"PING", nil, id, c}
-
-	<-c
-
+	// TODO: Perform necessary stuff
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called PING (ID) for server %s", id)
 }
@@ -88,11 +69,7 @@ func (node *Node) handleOneshotStore(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error reading value")
 	}
 
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"STORE", key, value, c}
-
-	<-c
-
+	// TODO: Perform necessary stuff
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
 }
@@ -105,11 +82,8 @@ func (node *Node) handleOneshotFindNode(w http.ResponseWriter, r *http.Request) 
 	id := r.URL.Path[len("/oneshot/findnode/"):]
 
 	// TODO: Check for valid id
-	// TODO: Get response
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"FINDNODE", id, nil, c}
-
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
 }
 
@@ -121,11 +95,8 @@ func (node *Node) handleOneshotFindValue(w http.ResponseWriter, r *http.Request)
 	key := r.URL.Path[len("/oneshot/findvalue/"):]
 
 	// TODO: Check for valid key
-	// TODO: Get response
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"FINDVALUE", key, nil, c}
-
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
 }
 
@@ -140,11 +111,7 @@ func (node *Node) handleIterativeStore(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error reading value")
 	}
 
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"STORE", key, value, c}
-
-	<-c
-
+	// TODO: Perform necessary stuff
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
 }
@@ -157,11 +124,8 @@ func (node *Node) handleIterativeFindNode(w http.ResponseWriter, r *http.Request
 	id := r.URL.Path[len("/iterative/findnode/"):]
 
 	// TODO: Check for valid id
-	// TODO: Get response
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"FINDNODE", id, nil, c}
-
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
 }
 
@@ -173,11 +137,8 @@ func (node *Node) handleIterativeFindValue(w http.ResponseWriter, r *http.Reques
 	key := r.URL.Path[len("/iterative/findvalue/"):]
 
 	// TODO: Check for valid key
-	// TODO: Get response
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"FINDVALUE", key, nil, c}
-
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
 }
 
@@ -186,7 +147,7 @@ func (node *Node) handleShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.restC <- CommandMessage{"SHUTDOWN", nil, nil, nil}
+	// TODO: Perform necessary stuff
 
 	fmt.Fprintf(w, "Called SHUTDOWN")
 }
