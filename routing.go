@@ -29,7 +29,7 @@ func NewContact(addr net.TCPAddr) *Contact {
 // Returns true if contact Id and Addr are equivalent
 // structs can be compared, but structs containing big.Int cannot
 func AreEqualContacts(a *Contact, b *Contact) bool {
-	return (a.Id.Cmp(&b.Id) == 0 && a.Addr.String() == b.Addr.String())
+	return (a.Id.Cmp(&b.Id) == 0)
 }
 
 // extra struct because we will want to implement split bucket
