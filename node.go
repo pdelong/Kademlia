@@ -77,7 +77,25 @@ func (node *Node) Ping(args PingArgs, reply *PingReply) error {
 	// TODO: Update k-bucket based on args.Source
 	node.rt.add(*contact)
 	*reply = PingReply{node.addr}
+	node.check_routing_table(args.Source)
 	return nil
+}
+
+func (node *Node) check_routing_table(dest net.TCPAddr) {
+	node.logger.Printf("Checking routing table")
+	hash := sha1.Sum([]byte(dest.String()))
+
+	id := *big.NewInt(0)
+	id.SetBytes(hash[:])
+
+	contact := node.rt.ContactFromID(id)
+	if (contact == nil) {
+		node.logger.Printf("Node not added")
+		return
+	}
+	node.logger.Printf("Printing node info")
+
+	node.logger.Printf("Id: %s, addr: %s", contact.Id.String(), contact.Addr.String())
 }
 
 // Store is the handler for the STORE RPC
@@ -170,7 +188,7 @@ func (node *Node) Run(toPing string) {
 			for range ticker.C {
 				node.doPing(*toPingAddr)
 				counter++
-				if counter == 5 {
+				if counter == 1 {
 					os.Exit(1)
 				}
 			}
@@ -219,6 +237,8 @@ func (node *Node) doPing(dest net.TCPAddr) {
 	node.logger.Printf("Got ping reply from %s", reply.Source.String())
 
 	// TODO: Update K-Buckets
+	contact := NewContact(reply.Source)
+	node.rt.add(*contact)
 }
 
 // Send a STORE RPC for (key, value) to dest

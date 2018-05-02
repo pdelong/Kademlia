@@ -3,7 +3,6 @@ package kademlia
 import (
 	"container/list"
 	"crypto/sha1"
-	"math"
 	"math/big"
 	"net"
 )
@@ -41,7 +40,7 @@ type RoutingTable struct {
 }
 
 func NewRoutingTable(owner *Node, k int, tRefresh int) *RoutingTable {
-	kBuckets := make([]*KBucket, 160, 160)
+	kBuckets := make([]*KBucket, 160)
 	rt := RoutingTable{owner, kBuckets, k, tRefresh}
 	return &rt
 }
@@ -61,31 +60,41 @@ func (self *RoutingTable) findContact() {
 func (table *RoutingTable) ContactFromID(id big.Int) *Contact {
 	contact := Contact{id, net.TCPAddr{}}
 
-	for _, bucket := range table.kBuckets {
-		result := bucket.getFromList(contact)
-		if result != nil {
-			// TODO: Handle case where cannot cast
+	// find the bucket it should be in
+	// if the bucket has been allocated (isn't nil), see if it's
+	// in the list
+
+	index := table.owner.GetKBucketFromId(&id)
+	table.owner.logger.Printf("Index is %d", index)
+	kbucket := table.kBuckets[index]
+
+	if (kbucket != nil) {
+		table.owner.logger.Printf("Found a kbucket")
+		result := kbucket.getFromList(contact)
+		if (result != nil) {
 			toReturn := result.Value.(Contact)
 			return &toReturn
 		}
+	} else {
+		return nil
 	}
-
 	return nil
 }
 
 func (self *RoutingTable) add(contact Contact) {
-	dist := float64(self.owner.distanceTo(&contact).Uint64())
-	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
+	index := self.owner.GetKBucketFromAddr(contact.Addr)
+	self.owner.logger.Printf("Adding node to bucket %d", index)	
 	if self.kBuckets[index] == nil {
+		self.owner.logger.Printf("Creating bucket %d", index)	
 		self.kBuckets[index] = NewKBucket(20)
 	}
 	self.kBuckets[index].addContact(contact)
+	self.owner.logger.Printf("Bucket after add: %v", self.kBuckets[index].contacts)
 	//TODO: handle failure to add
 }
 
 func (self *RoutingTable) remove(contact Contact) {
-	dist := float64(self.owner.distanceTo(&contact).Uint64())
-	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
+	index := self.owner.GetKBucketFromAddr(contact.Addr)
 	self.kBuckets[index].removeContact(contact)
 }
 
@@ -110,6 +119,7 @@ func NewKBucket(k int) *KBucket {
 
 // If bucket contains contact, returns ptr to element in list. Else, returns nil
 func (self *KBucket) getFromList(contact Contact) *list.Element {
+	
 	for e := self.contacts.Front(); e != nil; e = e.Next() {
 		curr, _ := e.Value.(Contact)
 		// TODO: handle error when element can't be cast to Contact
@@ -125,25 +135,28 @@ func (self *KBucket) addContact(contact Contact) bool {
 	// If contact exists, move to tail
 	element := self.getFromList(contact)
 	if element != nil {
-		self.contacts.MoveToBack(element)
+		self.contacts.MoveToFront(element)
 		return true
 	} else {
 		// If bucket isn't full, add to tail
 		// list.Len() = O(1)
 		if self.contacts.Len() < self.k {
-			self.contacts.PushBack(contact)
+			self.contacts.PushFront(contact)
 			return true
 		}
+		/* TODO: Deal when with buckets are full
 		// Otherwise, ping least-recently seen node
 		lruNode := self.contacts.Front()
-		// TODO: ping node... sigh this is gnna be ugly.
+		// ping node... sigh this is gnna be ugly.
 		if true {
 			// If no response, node is evicted and new sender is inserted at tail
 			self.contacts.Remove(lruNode)
 			self.contacts.PushBack(contact)
 			return true
 		}
-		// TODO: implement replacement cache
+		// implement replacement cache
+		return false
+		*/
 		return false
 	}
 }
