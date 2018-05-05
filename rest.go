@@ -1,11 +1,13 @@
 package kademlia
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -33,12 +35,13 @@ func (node *Node) handlePingIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.doPing(*addr)
+	node.logger.Printf("Performing IP PING of %s", addr)
 
-	// TODO: Return diagnostic information from doPing
-	// TODO: Logging
-
-	fmt.Fprintf(w, "Sent PING (IP) to %s", addr.String())
+	if node.doPing(*addr) {
+		fmt.Fprintf(w, "Host %s successfully pinged", ipString)
+	} else {
+		fmt.Fprintf(w, "PING of Host %s unsuccessful", ipString)
+	}
 }
 
 func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
@@ -55,9 +58,12 @@ func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	node.logger.Printf("Performing ID PING of %s", id.String())
+
 	contact := node.rt.ContactFromID(*id)
 	if contact == nil {
 		fmt.Fprintf(w, "Could not find %s in routing table", id.String())
+		node.logger.Printf("Could not find %s in the routing table", id.String())
 		return
 	}
 
@@ -65,10 +71,11 @@ func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
 
 	node.doPing(addr)
 
-	// TODO: Return diagnostic information from doPing
-	// TODO: Logging
-
-	fmt.Fprintf(w, "Sent PING (ID) to server %s", addr.String())
+	if node.doPing(addr) {
+		fmt.Fprintf(w, "Host %s successfully pinged", id.String())
+	} else {
+		fmt.Fprintf(w, "PING of Host %s unsuccessful", id.String())
+	}
 }
 
 func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
@@ -82,10 +89,32 @@ func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error reading value")
 	}
 
-	// TODO: Store the key
-	// TODO: Mark this node as the originator
-	// TODO: Send back response
-	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
+	node.logger.Printf("Received STORE for key: (%s), value: (%s)", key, value)
+
+	node.ht.add(key, value, true)
+
+	fmt.Fprintf(w, "Successfully stored key (%s)", key)
+}
+
+func (node *Node) handleGetTable(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"GET"}, r, w) {
+		return
+	}
+
+	ch := node.ht.Iterator()
+
+	a := make([]map[string]interface{}, 0)
+	for val := range ch {
+		d := make(map[string]interface{})
+		d["key"] = val.key
+		d["value"] = val.val
+		fmt.Println(val.val)
+		d["isOrigin"] = val.isOrigin
+		a = append(a, d)
+	}
+
+	enc := json.NewEncoder(w)
+	enc.Encode(a)
 }
 
 func (node *Node) handleOneshotFindNode(w http.ResponseWriter, r *http.Request) {
@@ -145,9 +174,11 @@ func (node *Node) handleShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Perform necessary stuff
+	node.logger.Println("Shutdown received. Terminating")
 
 	fmt.Fprintf(w, "Called SHUTDOWN")
+
+	os.Exit(0)
 }
 
 // setupControlEndpoints registers handlers for the remote control REST API
@@ -170,10 +201,14 @@ func (node *Node) setupControlEndpoints() {
 
 	// Handle request to store (key,value) in the DHT
 	// This node becomes the originator
-	// POST /store/<key hash>
+	// POST /store/<key>
 	// Body is raw value
 	http.HandleFunc("/store/", func(w http.ResponseWriter, r *http.Request) {
 		node.handleStore(w, r)
+	})
+
+	http.HandleFunc("/table", func(w http.ResponseWriter, r *http.Request) {
+		node.handleGetTable(w, r)
 	})
 
 	// Handle oneshot request to find node with specific node id
@@ -183,7 +218,7 @@ func (node *Node) setupControlEndpoints() {
 	})
 
 	// Handle oneshot request to find specific value
-	// GET /findvalue/<key hash>
+	// GET /findvalue/<key>
 	http.HandleFunc("/oneshot/findvalue/", func(w http.ResponseWriter, r *http.Request) {
 		node.handleOneshotFindValue(w, r)
 	})
@@ -195,7 +230,7 @@ func (node *Node) setupControlEndpoints() {
 	})
 
 	// Handle iterative request to find specific value
-	// GET /findvalue/<key hash>
+	// GET /findvalue/<key>
 	http.HandleFunc("/iterative/findvalue/", func(w http.ResponseWriter, r *http.Request) {
 		node.handleIterativeFindValue(w, r)
 	})

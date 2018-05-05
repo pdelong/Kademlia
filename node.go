@@ -17,7 +17,7 @@ import (
 type Node struct {
 	id     big.Int
 	addr   net.TCPAddr
-	ht     map[string][]byte
+	ht     KVStore
 	rt     *RoutingTable
 	logger *log.Logger
 }
@@ -89,7 +89,7 @@ func (node *Node) check_routing_table(dest net.TCPAddr) {
 	id.SetBytes(hash[:])
 
 	contact := node.rt.ContactFromID(id)
-	if (contact == nil) {
+	if contact == nil {
 		node.logger.Printf("Node not added")
 		return
 	}
@@ -105,7 +105,10 @@ func (node *Node) Store(args StoreArgs, reply *StoreReply) error {
 		return errors.New("Couldn't hash IP address")
 	}
 
-	node.ht[args.Key] = args.Val
+	// TODO: Might have to check if we're already the origin before overwriting
+	// with false
+	node.ht.add(args.Key, args.Val, false)
+
 	// TODO: update kbuckets/ reply?
 	return nil
 }
@@ -161,6 +164,8 @@ func NewNode(address string) *Node {
 	node.rt = NewRoutingTable(node, 20, 3600)
 
 	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+
+	node.ht = *NewKVStore()
 
 	return node
 }
@@ -226,12 +231,12 @@ func (node *Node) doRPC(method string, dest net.TCPAddr, args interface{}, reply
 
 // Send a PING RPC to dest
 // TODO: Return diagnostic information
-func (node *Node) doPing(dest net.TCPAddr) {
+func (node *Node) doPing(dest net.TCPAddr) bool {
 	args := PingArgs{node.addr}
 	var reply PingReply
 
 	if !node.doRPC("Ping", dest, args, &reply) {
-		return
+		return false
 	}
 
 	node.logger.Printf("Got ping reply from %s", reply.Source.String())
@@ -239,10 +244,11 @@ func (node *Node) doPing(dest net.TCPAddr) {
 	// TODO: Update K-Buckets
 	contact := NewContact(reply.Source)
 	node.rt.add(*contact)
+
+	return true
 }
 
 // Send a STORE RPC for (key, value) to dest
-// TODO: Return diagnostic information
 func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 	args := StoreArgs{node.addr, key, value}
 	var reply StoreReply
