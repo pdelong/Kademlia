@@ -20,7 +20,6 @@ type Node struct {
 	ht     map[string][]byte
 	rt     *RoutingTable
 	logger *log.Logger
-	restC  chan CommandMessage
 }
 
 // PingArgs contains the arguments for the PING RPC
@@ -71,16 +70,33 @@ type FindNodeReply struct {
 func (node *Node) Ping(args PingArgs, reply *PingReply) error {
 	contact := NewContact(args.Source)
 
+	node.logger.Printf("Ping from %s", args.Source.String())
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 	node.rt.add(*contact)
 
-	node.logger.Printf("Ping from %s", args.Source.String())
-
 	// Update k-bucket based on args.Source
 	*reply = PingReply{node.addr}
+	node.check_routing_table(args.Source)
 	return nil
+}
+
+func (node *Node) check_routing_table(dest net.TCPAddr) {
+	node.logger.Printf("Checking routing table")
+	hash := sha1.Sum([]byte(dest.String()))
+
+	id := *big.NewInt(0)
+	id.SetBytes(hash[:])
+
+	contact := node.rt.ContactFromID(id)
+	if (contact == nil) {
+		node.logger.Printf("Node not added")
+		return
+	}
+	node.logger.Printf("Printing node info")
+
+	node.logger.Printf("Id: %s, addr: %s", contact.Id.String(), contact.Addr.String())
 }
 
 // Store is the handler for the STORE RPC
@@ -161,7 +177,6 @@ func NewNode(address string) *Node {
 	node.id.SetBytes(hash[:])
 	// TODO: take in k and tRefresh arguments - for now just hardcoding default
 	node.rt = NewRoutingTable(node)
-	node.restC = make(chan CommandMessage)
 
 	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 
@@ -175,55 +190,28 @@ func (node *Node) Run(toPing string) {
 	rpc.HandleHTTP()
 	node.setupControlEndpoints()
 
-	// Removed this from if statement. May need to put it back
-	toPingAddr, err := net.ResolveTCPAddr("", toPing)
-	//TODO: handle err
-	if err != nil {
-		node.logger.Printf("%s", err)
-	}
+	// if the node was passed a node to ping, otherwise
+	// don't bother
+	if toPing != "" {
+		toPingAddr, err := net.ResolveTCPAddr("", toPing)
+		//TODO: handle err
+		if err != nil {
+			node.logger.Printf("%s", err)
+		}
 
-	ticker := time.NewTicker(1 * time.Second)
-	counter := 0
-
-	go func() {
-		for {
-			select {
-			case msg := <-node.restC:
-				switch msg.Command {
-				case "PING":
-					contact, ok := msg.Arg1.(Contact)
-					if !ok {
-						fmt.Printf("PING REST argument is not a Contact")
-					}
-
-					fmt.Printf("Performing PING for IP: %s (ID: %s)\n",
-						contact.Addr.String(),
-						contact.Id.String())
-				case "STORE":
-					key := msg.Arg1
-					value := msg.Arg2
-					fmt.Printf("Performing STORE of key: %s, value: %s\n", key, value)
-				case "FINDNODE":
-					id := msg.Arg1
-					fmt.Printf("Performing FINDNODE of server id: %s\n", id)
-				case "FINDVALUE":
-					key := msg.Arg1
-					fmt.Printf("Performing FINDVALUE of key: %s\n", key)
-				case "SHUTDOWN":
-					fmt.Println("Shutting down...")
-					os.Exit(0)
-				}
-			case <-ticker.C:
-				if toPing != "" {
-					node.doPing(*toPingAddr)
-					counter++
-					if counter == 5 {
-						os.Exit(1)
-					}
+		// periodically ping
+		ticker := time.NewTicker(1 * time.Second)
+		counter := 0
+		go func() {
+			for range ticker.C {
+				node.doPing(*toPingAddr)
+				counter++
+				if counter == 1 {
+					os.Exit(1)
 				}
 			}
-		}
-	}()
+		}()
+	}
 
 	// open our own port for connection
 	l, e := net.ListenTCP("tcp", &node.addr)
@@ -255,6 +243,7 @@ func (node *Node) doRPC(method string, dest net.TCPAddr, args interface{}, reply
 }
 
 // Send a PING RPC to dest
+// TODO: Return diagnostic information
 func (node *Node) doPing(dest net.TCPAddr) {
 	args := PingArgs{node.addr}
 	var reply PingReply
@@ -264,9 +253,14 @@ func (node *Node) doPing(dest net.TCPAddr) {
 	}
 
 	node.logger.Printf("Got ping reply from %s", reply.Source.String())
+
+	// TODO: Update K-Buckets
+	contact := NewContact(reply.Source)
+	node.rt.add(*contact)
 }
 
 // Send a STORE RPC for (key, value) to dest
+// TODO: Return diagnostic information
 func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 	args := StoreArgs{node.addr, key, value}
 	var reply StoreReply

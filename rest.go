@@ -9,14 +9,6 @@ import (
 	"strings"
 )
 
-// CommandMessage is a container for messages sent from the REST api to the node
-type CommandMessage struct {
-	Command string
-	Arg1    interface{}
-	Arg2    interface{}
-	Resp    chan interface{} //TODO: There might be a better option. string?
-}
-
 func checkMethod(methods []string, request *http.Request, w http.ResponseWriter) bool {
 	for _, method := range methods {
 		if method == request.Method {
@@ -41,15 +33,12 @@ func (node *Node) handlePingIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contact := NewContact(*addr)
+	node.doPing(*addr)
 
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"PING", contact, nil, c}
+	// TODO: Return diagnostic information from doPing
+	// TODO: Logging
 
-	<-c
-
-	// TODO: Send back response
-	fmt.Fprintf(w, "REST: Received PING (IP) for server %s", addr.String())
+	fmt.Fprintf(w, "Sent PING (IP) to %s", addr.String())
 }
 
 func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
@@ -66,15 +55,20 @@ func (node *Node) handlePingID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: See if id in kbuckets, else return error
+	contact := node.rt.ContactFromID(*id)
+	if contact == nil {
+		fmt.Fprintf(w, "Could not find %s in routing table", id.String())
+		return
+	}
 
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"PING", nil, id, c}
+	addr := contact.Addr
 
-	<-c
+	node.doPing(addr)
 
-	// TODO: Send back response
-	fmt.Fprintf(w, "Called PING (ID) for server %s", id)
+	// TODO: Return diagnostic information from doPing
+	// TODO: Logging
+
+	fmt.Fprintf(w, "Sent PING (ID) to server %s", addr.String())
 }
 
 func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
@@ -88,44 +82,61 @@ func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error reading value")
 	}
 
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"STORE", key, value, c}
-
-	<-c
-
+	// TODO: Store the key
+	// TODO: Mark this node as the originator
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called STORE for key %s with value %s", key, value)
 }
 
-func (node *Node) handleFindNode(w http.ResponseWriter, r *http.Request) {
+func (node *Node) handleOneshotFindNode(w http.ResponseWriter, r *http.Request) {
 	if !checkMethod([]string{"GET"}, r, w) {
 		return
 	}
 
-	id := r.URL.Path[len("/findnode/"):]
+	id := r.URL.Path[len("/iterative/findnode/"):]
 
 	// TODO: Check for valid id
-	// TODO: Get response
-
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"FINDNODE", id, nil, c}
-
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
 }
 
-func (node *Node) handleFindValue(w http.ResponseWriter, r *http.Request) {
+func (node *Node) handleOneshotFindValue(w http.ResponseWriter, r *http.Request) {
 	if !checkMethod([]string{"GET"}, r, w) {
 		return
 	}
 
-	key := r.URL.Path[len("/findvalue/"):]
+	key := r.URL.Path[len("/oneshot/findvalue/"):]
 
 	// TODO: Check for valid key
-	// TODO: Get response
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
+	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
+}
 
-	c := make(chan interface{})
-	node.restC <- CommandMessage{"FINDVALUE", key, nil, c}
+func (node *Node) handleIterativeFindNode(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"GET"}, r, w) {
+		return
+	}
 
+	id := r.URL.Path[len("/iterative/findnode/"):]
+
+	// TODO: Check for valid id
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
+	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
+}
+
+func (node *Node) handleIterativeFindValue(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"GET"}, r, w) {
+		return
+	}
+
+	key := r.URL.Path[len("/iterative/findvalue/"):]
+
+	// TODO: Check for valid key
+	// TODO: Perform necessary stuff
+	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
 }
 
@@ -134,7 +145,7 @@ func (node *Node) handleShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node.restC <- CommandMessage{"SHUTDOWN", nil, nil, nil}
+	// TODO: Perform necessary stuff
 
 	fmt.Fprintf(w, "Called SHUTDOWN")
 }
@@ -158,22 +169,35 @@ func (node *Node) setupControlEndpoints() {
 	})
 
 	// Handle request to store (key,value) in the DHT
+	// This node becomes the originator
 	// POST /store/<key hash>
 	// Body is raw value
 	http.HandleFunc("/store/", func(w http.ResponseWriter, r *http.Request) {
 		node.handleStore(w, r)
 	})
 
-	// Handle request to find node with specific node id
+	// Handle oneshot request to find node with specific node id
 	// GET /find/<id>
-	http.HandleFunc("/findnode/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleFindNode(w, r)
+	http.HandleFunc("/oneshot/findnode/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleOneshotFindNode(w, r)
 	})
 
-	// Handle request to find specific value
+	// Handle oneshot request to find specific value
 	// GET /findvalue/<key hash>
-	http.HandleFunc("/findvalue/", func(w http.ResponseWriter, r *http.Request) {
-		node.handleFindValue(w, r)
+	http.HandleFunc("/oneshot/findvalue/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleOneshotFindValue(w, r)
+	})
+
+	// Handle iterative request to find node with specific node id
+	// GET /find/<id>
+	http.HandleFunc("/iterative/findnode/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleIterativeFindNode(w, r)
+	})
+
+	// Handle iterative request to find specific value
+	// GET /findvalue/<key hash>
+	http.HandleFunc("/iterative/findvalue/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleIterativeFindValue(w, r)
 	})
 
 	// Handle request to shutdown server

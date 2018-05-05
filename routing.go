@@ -1,22 +1,12 @@
 package kademlia
 
 import (
-	//"crypto/sha1"
-	//"errors"
-	//"fmt"
-	//"log"
-	//"math/big"
 	"net"
 	"sort"
 	"sync"
-	//"net/http"
-	//"net/rpc"
-	//"os"
-	//"time"
 )
 
 // This file contains the iterative RPCs used for information progagation throughout nodes
-
 // Calls STORE RPC on k Contacts ( Don't call on self?)
 func (node *Node) doIterativeStore(key string, value []byte, dest net.TCPAddr) {
 	shortlist := node.doIterativeFindNode(dest)
@@ -26,7 +16,6 @@ func (node *Node) doIterativeStore(key string, value []byte, dest net.TCPAddr) {
 		go func() {
 			args := StoreArgs{node.addr, key, value}
 			var reply StoreReply
-
 			if !node.doRPC("Store", contact.Addr, args, &reply) {
 				return
 			}
@@ -44,7 +33,6 @@ func (node *Node) doIterativeFindValue(key string, dest net.TCPAddr) []byte {
 
 	// TODO: If we find the value, STORE RPC sent to closest contact that did not return value
 	return nil
-
 }
 
 // Iteratively send a FINDNODE RPC

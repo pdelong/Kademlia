@@ -3,7 +3,6 @@ package kademlia
 import (
 	"container/list"
 	"crypto/sha1"
-	"math"
 	"math/big"
 	"net"
 	"sort"
@@ -30,7 +29,7 @@ func NewContact(addr net.TCPAddr) *Contact {
 // Returns true if contact Id and Addr are equivalent
 // structs can be compared, but structs containing big.Int cannot
 func AreEqualContacts(a *Contact, b *Contact) bool {
-	return (a.Id.Cmp(&b.Id) == 0 && a.Addr.String() == b.Addr.String())
+	return (a.Id.Cmp(&b.Id) == 0)
 }
 
 // extra struct because we will want to implement split bucket
@@ -42,7 +41,7 @@ type RoutingTable struct {
 }
 
 func NewRoutingTable(owner *Node) *RoutingTable {
-	kBuckets := make([]*KBucket, 160, 160)
+	kBuckets := make([]*KBucket, 160)
 	numNeighbors := 0
 	mu := &sync.Mutex{}
 	rt := RoutingTable{owner, kBuckets, numNeighbors, mu}
@@ -60,8 +59,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 
 	kNearest := make([]Contact, k)
 	// To find the k closest contacts, we start looking from the bucket that the contact would be in
-	dist := float64(distanceBetween(id, self.owner.id).Uint64())
-	index := int(math.Ceil(math.Log(dist) / math.Log(2)))
+	index := self.owner.GetKBucketFromId(&id)
 	copy(kNearest, self.kBuckets[index].getAllContacts())
 
 	// If less than k contacts are in the bucket, then take the closest from the left
@@ -98,23 +96,22 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	return kNearest
 }
 
+
 func (self *RoutingTable) add(contact Contact) {
-	dist := float64(self.owner.distanceTo(&contact).Uint64())
-	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
+	index := self.owner.GetKBucketFromAddr(contact.Addr)
+	self.owner.logger.Printf("Adding node to bucket %d", index)	
 	if self.kBuckets[index] == nil {
+		self.owner.logger.Printf("Creating bucket %d", index)	
 		self.kBuckets[index] = NewKBucket(20)
 	}
 	self.kBuckets[index].addContact(contact)
-	self.numNeighbors++
+	self.owner.logger.Printf("Bucket after add: %v", self.kBuckets[index].contacts)
 	//TODO: handle failure to add
 }
 
 func (self *RoutingTable) remove(contact Contact) {
-	dist := float64(self.owner.distanceTo(&contact).Uint64())
-	// This calculation finds the smallest number of bits needed to express the dist
-	index := int(math.Ceil(math.Log(dist) / math.Log(2))) // Find which bucket it belongs to
+	index := self.owner.GetKBucketFromAddr(contact.Addr)
 	self.kBuckets[index].removeContact(contact)
-	self.numNeighbors--
 }
 
 // Not even sure if we will use this
@@ -165,27 +162,56 @@ func (self *KBucket) addContact(contact Contact) bool {
 	// If contact exists, move to tail
 	element := self.getFromList(contact)
 	if element != nil {
-		self.contacts.MoveToBack(element)
+		self.contacts.MoveToFront(element)
 		return true
 	} else {
 		// If bucket isn't full, add to tail
 		// list.Len() = O(1)
-		if self.contacts.Len() < k {
-			self.contacts.PushBack(contact)
+		if self.contacts.Len() < self.k {
+			self.contacts.PushFront(contact)
 			return true
 		}
+		/* TODO: Deal when with buckets are full
 		// Otherwise, ping least-recently seen node
 		lruNode := self.contacts.Front()
-		// TODO: ping node... sigh this is gnna be ugly.
+		// ping node... sigh this is gnna be ugly.
 		if true {
 			// If no response, node is evicted and new sender is inserted at tail
 			self.contacts.Remove(lruNode)
 			self.contacts.PushBack(contact)
 			return true
 		}
-		// TODO: implement replacement cache
+		// implement replacement cache
+		return false
+		*/
 		return false
 	}
+}
+
+// ContactFromID returns the contact that belongs to id if it exists and nil if
+// it doesn't
+func (table *RoutingTable) ContactFromID(id big.Int) *Contact {
+	contact := Contact{id, net.TCPAddr{}}
+
+	// find the bucket it should be in
+	// if the bucket has been allocated (isn't nil), see if it's
+	// in the list
+
+	index := table.owner.GetKBucketFromId(&id)
+	table.owner.logger.Printf("Index is %d", index)
+	kbucket := table.kBuckets[index]
+
+	if (kbucket != nil) {
+		table.owner.logger.Printf("Found a kbucket")
+		result := kbucket.getFromList(contact)
+		if (result != nil) {
+			toReturn := result.Value.(Contact)
+			return &toReturn
+		}
+	} else {
+		return nil
+	}
+	return nil
 }
 
 // Returns true if contact exists, false otherwise
