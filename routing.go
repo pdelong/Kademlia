@@ -1,6 +1,7 @@
 package kademlia
 
 import (
+	"math/big"
 	"net"
 	"sort"
 	"sync"
@@ -8,8 +9,8 @@ import (
 
 // This file contains the iterative RPCs used for information progagation throughout nodes
 // Calls STORE RPC on k Contacts ( Don't call on self?)
-func (node *Node) doIterativeStore(key string, value []byte, dest net.TCPAddr) {
-	shortlist := node.doIterativeFindNode(dest)
+func (node *Node) doIterativeStore(key string, value []byte) {
+	shortlist := node.doIterativeFindNode(key)
 
 	// get k contacts and send STORE RPC to each
 	for _, contact := range shortlist {
@@ -37,14 +38,14 @@ func (node *Node) doIterativeFindValue(key string, dest net.TCPAddr) []byte {
 
 // Iteratively send a FINDNODE RPC
 // Returns a shortlist of k closest nodes
-func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
+func (node *Node) doIterativeFindNode(key string) []Contact {
 	//Iterations continue until no contacts returned that are closer or if all contacts in shortlist are active (k contacts have been queried)
-	toFind := NewContact(dest)
+	toFindId := new(big.Int)
+	toFindId.SetString(key, key_base)
 	contacted := make(map[string]bool)
 	shortlist := make([]Contact, 0, 20)
 
-	// Get nearest from own RT - a bit weird to do through RPCs for self though
-	shortlist = node.doFindNode(dest)
+	shortlist = node.rt.findKNearestContacts(node.id)
 
 	// while nearest contacts is not same, keep on iterating
 	for {
@@ -70,8 +71,8 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 
 				// update the shortlist
 				sort.Slice(responseShortlist, func(i, j int) bool {
-					iDist := distanceBetween(toFind.Id, responseShortlist[i].Id)
-					jDist := distanceBetween(toFind.Id, responseShortlist[j].Id)
+					iDist := distanceBetween(*toFindId, responseShortlist[i].Id)
+					jDist := distanceBetween(*toFindId, responseShortlist[j].Id)
 					return (iDist.Cmp(jDist) == -1)
 				})
 				contactChan <- responseShortlist[:k]
@@ -86,8 +87,8 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 			copy(updatedShortlist, shortlist)
 
 			for s := range contactChan {
-				newClosestDist := distanceBetween(toFind.Id, s[0].Id)
-				currClosestDist := distanceBetween(toFind.Id, updatedShortlist[0].Id)
+				newClosestDist := distanceBetween(*toFindId, s[0].Id)
+				currClosestDist := distanceBetween(*toFindId, updatedShortlist[0].Id)
 				// if newClosestDist >= currClosestDist
 				if (newClosestDist.Cmp(currClosestDist) == 0) || 
 				   (newClosestDist.Cmp(currClosestDist) == 1) {
@@ -97,8 +98,8 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 				updatedShortlist = append(updatedShortlist, s...)
 				// update the shortlist
 				sort.Slice(updatedShortlist, func(i, j int) bool {
-					iDist := distanceBetween(toFind.Id, updatedShortlist[i].Id)
-					jDist := distanceBetween(toFind.Id, updatedShortlist[j].Id)
+					iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
+					jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
 					return (iDist.Cmp(jDist) == -1)
 				})
 				updatedShortlist = updatedShortlist[:k]
@@ -116,12 +117,12 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 						sendingTo = append(sendingTo, shortlist[i])
 					}
 				}
-				responseShortlist := node.findNodeToK(toFind, sendingTo)
+				responseShortlist := node.findNodeToK(toFindId, sendingTo)
 				updatedShortlist = append(updatedShortlist, responseShortlist...)
 				// update the shortlist
 				sort.Slice(updatedShortlist, func(i, j int) bool {
-					iDist := distanceBetween(toFind.Id, updatedShortlist[i].Id)
-					jDist := distanceBetween(toFind.Id, updatedShortlist[j].Id)
+					iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
+					jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
 					return (iDist.Cmp(jDist) == -1)
 				})
 				updatedShortlist = updatedShortlist[:k]
@@ -150,7 +151,7 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 	return shortlist
 }
 
-func (node *Node) findNodeToK(toFind *Contact, toSend []Contact) []Contact {
+func (node *Node) findNodeToK(toFindId *big.Int, toSend []Contact) []Contact {
 	contactChan := make(chan []Contact)
 	var wg sync.WaitGroup
 	wg.Add(len(toSend))
@@ -172,8 +173,8 @@ func (node *Node) findNodeToK(toFind *Contact, toSend []Contact) []Contact {
 		updatedShortlist = append(updatedShortlist, s...)
 		// update the shortlist
 		sort.Slice(updatedShortlist, func(i, j int) bool {
-			iDist := distanceBetween(toFind.Id, updatedShortlist[i].Id)
-			jDist := distanceBetween(toFind.Id, updatedShortlist[j].Id)
+			iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
+			jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
 			return (iDist.Cmp(jDist) == -1)
 		})
 		updatedShortlist = updatedShortlist[:k]

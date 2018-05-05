@@ -22,3 +22,6 @@ const alpha = 3
 
 // k is the maximum number of contacts stored in a bucket
 const k = 20
+
+// keys should be stored as hex when in string form
+const key_base = 16
