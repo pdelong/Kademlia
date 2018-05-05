@@ -6,18 +6,9 @@ import time
 import base64
 import json
 
-def decode_base64(data):
-    """Decode base64, padding being optional.
 
-    :param data: Base64 data as an ASCII byte string
-    :returns: The decoded byte string.
-
-    """
-    missing_padding = len(data) % 4
-    if missing_padding != 0:
-        data += b'='* (4 - missing_padding)
-    return base64.decodestring(data)
-
+# with Stopwatch():
+#     pass
 class Stopwatch:
     def __enter__(self):
         self.start = time.clock()
@@ -33,8 +24,7 @@ class KademliaNode:
         self.address = address
 
     def store(self, key, value):
-        with Stopwatch():
-            requests.post("http://{}/store/{}".format(self.address, key), data=value)
+        requests.post("http://{}/store/{}".format(self.address, key), data=value)
 
     def ping(self, target, byid):
         if byid:
@@ -48,8 +38,7 @@ class KademliaNode:
 
     def shutdown(self):
             try:
-                with Stopwatch():
-                    requests.get("http://{}/shutdown".format(self.address))
+                requests.get("http://{}/shutdown".format(self.address))
             except:
                 pass
 
