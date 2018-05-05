@@ -13,13 +13,13 @@ func (node *Node) doIterativeStore(key string, value []byte, dest net.TCPAddr) {
 
 	// get k contacts and send STORE RPC to each
 	for _, contact := range shortlist {
-		go func() {
+		go func(contact Contact) {
 			args := StoreArgs{node.addr, key, value}
 			var reply StoreReply
 			if !node.doRPC("Store", contact.Addr, args, &reply) {
 				return
 			}
-		}()
+		}(contact)
 	}
 }
 
