@@ -7,6 +7,8 @@ import base64
 import json
 
 
+# with Stopwatch():
+#     pass
 class Stopwatch:
     def __enter__(self):
         self.start = time.clock()
@@ -22,8 +24,7 @@ class KademliaNode:
         self.address = address
 
     def store(self, key, value):
-        with Stopwatch():
-            requests.post("http://{}/store/{}".format(self.address, key), data=value)
+        requests.post("http://{}/store/{}".format(self.address, key), data=value)
 
     def ping(self, target, byid):
         if byid:
@@ -37,8 +38,7 @@ class KademliaNode:
 
     def shutdown(self):
             try:
-                with Stopwatch():
-                    requests.get("http://{}/shutdown".format(self.address))
+                requests.get("http://{}/shutdown".format(self.address))
             except:
                 pass
 
