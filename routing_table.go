@@ -9,13 +9,13 @@ import (
 	"sync"
 )
 
-// An entry in the k-bucket
+// Contact is an entry in the k-bucket
 type Contact struct {
 	Id   big.Int
 	Addr net.TCPAddr
 }
 
-// Create a new Contact struct based on addr by taking the hash
+// NewContact creates a new Contact struct based on addr by taking the hash
 func NewContact(addr net.TCPAddr) *Contact {
 	hash := sha1.Sum([]byte(addr.String()))
 
@@ -26,7 +26,7 @@ func NewContact(addr net.TCPAddr) *Contact {
 	return &nodeEntry
 }
 
-// Returns true if contact Id and Addr are equivalent
+// AreEqualContacts returns true if contact Id and Addr are equivalent
 // structs can be compared, but structs containing big.Int cannot
 func AreEqualContacts(a *Contact, b *Contact) bool {
 	return (a.Id.Cmp(&b.Id) == 0)
@@ -59,7 +59,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 
 	kNearest := make([]Contact, k)
 	// To find the k closest contacts, we start looking from the bucket that the contact would be in
-	index := self.owner.GetKBucketFromId(&id)
+	index := self.owner.GetKBucketFromID(&id)
 	copy(kNearest, self.kBuckets[index].getAllContacts())
 
 	// If less than k contacts are in the bucket, then take the closest from the left
@@ -96,12 +96,11 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	return kNearest
 }
 
-
 func (self *RoutingTable) add(contact Contact) {
 	index := self.owner.GetKBucketFromAddr(contact.Addr)
-	self.owner.logger.Printf("Adding node to bucket %d", index)	
+	self.owner.logger.Printf("Adding node to bucket %d", index)
 	if self.kBuckets[index] == nil {
-		self.owner.logger.Printf("Creating bucket %d", index)	
+		self.owner.logger.Printf("Creating bucket %d", index)
 		self.kBuckets[index] = NewKBucket(20)
 	}
 	self.kBuckets[index].addContact(contact)
@@ -197,14 +196,14 @@ func (table *RoutingTable) ContactFromID(id big.Int) *Contact {
 	// if the bucket has been allocated (isn't nil), see if it's
 	// in the list
 
-	index := table.owner.GetKBucketFromId(&id)
+	index := table.owner.GetKBucketFromID(&id)
 	table.owner.logger.Printf("Index is %d", index)
 	kbucket := table.kBuckets[index]
 
-	if (kbucket != nil) {
+	if kbucket != nil {
 		table.owner.logger.Printf("Found a kbucket")
 		result := kbucket.getFromList(contact)
-		if (result != nil) {
+		if result != nil {
 			toReturn := result.Value.(Contact)
 			return &toReturn
 		}

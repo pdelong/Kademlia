@@ -89,10 +89,10 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 				newClosestDist := distanceBetween(toFind.Id, s[0].Id)
 				currClosestDist := distanceBetween(toFind.Id, updatedShortlist[0].Id)
 				// if newClosestDist >= currClosestDist
-				if (newClosestDist.Cmp(currClosestDist) == 0) || 
-				   (newClosestDist.Cmp(currClosestDist) == 1) {
+				if (newClosestDist.Cmp(currClosestDist) == 0) ||
+					(newClosestDist.Cmp(currClosestDist) == 1) {
 					noCloser++
-				} 
+				}
 
 				updatedShortlist = append(updatedShortlist, s...)
 				// update the shortlist
@@ -104,9 +104,9 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 				updatedShortlist = updatedShortlist[:k]
 			}
 
-			// if we didn't find anything closer in last round, ping the rest of the 
+			// if we didn't find anything closer in last round, ping the rest of the
 			// shortlist that are unseen
-			if (noCloser == alpha) {
+			if noCloser == alpha {
 				sendingTo := make([]Contact, 0, 20)
 				for i := 0; i < len(shortlist); i++ {
 					toPing := shortlist[i].Addr
@@ -138,9 +138,9 @@ func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
 			}
 			if !changed {
 				return updatedShortlist
-			} else {
-				shortlist = updatedShortlist
 			}
+
+			shortlist = updatedShortlist
 
 			if pinged >= 3 {
 				break

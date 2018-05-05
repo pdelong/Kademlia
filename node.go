@@ -78,11 +78,11 @@ func (node *Node) Ping(args PingArgs, reply *PingReply) error {
 
 	// Update k-bucket based on args.Source
 	*reply = PingReply{node.addr}
-	node.check_routing_table(args.Source)
+	node.checkRoutingTable(args.Source)
 	return nil
 }
 
-func (node *Node) check_routing_table(dest net.TCPAddr) {
+func (node *Node) checkRoutingTable(dest net.TCPAddr) {
 	node.logger.Printf("Checking routing table")
 	hash := sha1.Sum([]byte(dest.String()))
 
@@ -129,8 +129,8 @@ func (node *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 	}
 
 	// Otherwise, return set of k triples (equiv. to FindNode)
-	kNearest := node.rt.findKNearestContacts(contact.Id)
-	*reply = FindValueReply{Contacts: kNearest}
+	nearest := node.rt.findKNearestContacts(contact.Id)
+	*reply = FindValueReply{Contacts: nearest}
 	return nil
 }
 
@@ -142,8 +142,8 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	}
 	node.rt.add(*contact)
 
-	kNearest := node.rt.findKNearestContacts(contact.Id)
-	*reply = FindNodeReply{Contacts: kNearest}
+	nearest := node.rt.findKNearestContacts(contact.Id)
+	*reply = FindNodeReply{Contacts: nearest}
 	return nil
 }
 
@@ -159,8 +159,8 @@ func (node *Node) distanceTo(other *Contact) *big.Int {
 	return big.NewInt(0).Xor(&node.id, &other.Id)
 }
 
-func distanceBetween(firstId big.Int, secondId big.Int) *big.Int {
-	return big.NewInt(0).Xor(&firstId, &secondId)
+func distanceBetween(firstID big.Int, secondID big.Int) *big.Int {
+	return big.NewInt(0).Xor(&firstID, &secondID)
 }
 
 // NewNode returns a new Node struct

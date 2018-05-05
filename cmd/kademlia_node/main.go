@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-func check_io_err(e error) {
+func checkIOError(e error) {
 	if e != nil && e != io.EOF {
 		log.Fatal(e)
 	}
@@ -33,10 +33,10 @@ func main() {
 	bootstrapAddr := ""
 	if args[1] == "nb" {
 		file, err := os.Open("bootstrap_nodes")
-		check_io_err(err)
+		checkIOError(err)
 		reader := bufio.NewReader(file)
 		bootstrapAddrBytes, _, err := reader.ReadLine()
-		check_io_err(err)
+		checkIOError(err)
 		bootstrapAddr = string(bootstrapAddrBytes)
 		fmt.Println("Contacting ", bootstrapAddr)
 	}
