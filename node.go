@@ -51,31 +51,32 @@ type FindValueArgs struct {
 
 // FindValueReply contains the results for the FINDVALUE RPC
 type FindValueReply struct {
-	Val  []byte
-	Node Contact
+	Val      []byte
+	Contacts []Contact
 }
 
 // FindNodeArgs contains the arguments for the FINDNODE RPC
 type FindNodeArgs struct {
 	Source net.TCPAddr
-	Key    string
+	//Key    string
 }
 
 // FindNodeReply contains the results for the FINDNODE RPC
 type FindNodeReply struct {
+	Contacts []Contact
 }
 
 // Ping is the handler for the PING RPC
 func (node *Node) Ping(args PingArgs, reply *PingReply) error {
 	contact := NewContact(args.Source)
 
+	node.logger.Printf("Ping from %s", args.Source.String())
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
-
-	node.logger.Printf("Ping from %s", args.Source.String())
-	// TODO: Update k-bucket based on args.Source
 	node.rt.add(*contact)
+
+	// Update k-bucket based on args.Source
 	*reply = PingReply{node.addr}
 	node.check_routing_table(args.Source)
 	return nil
@@ -104,12 +105,13 @@ func (node *Node) Store(args StoreArgs, reply *StoreReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
 
 	// TODO: Might have to check if we're already the origin before overwriting
 	// with false
 	node.ht.add(args.Key, args.Val, false)
 
-	// TODO: update kbuckets/ reply?
+	*reply = StoreReply{}
 	return nil
 }
 
@@ -119,7 +121,16 @@ func (node *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
+	// If node contains key, returns associated data
+	if val, ok := node.ht.get(args.Key); ok {
+		*reply = FindValueReply{Val: val}
+		return nil
+	}
 
+	// Otherwise, return set of k triples (equiv. to FindNode)
+	kNearest := node.rt.findKNearestContacts(contact.Id)
+	*reply = FindValueReply{Contacts: kNearest}
 	return nil
 }
 
@@ -129,7 +140,10 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
+	node.rt.add(*contact)
 
+	kNearest := node.rt.findKNearestContacts(contact.Id)
+	*reply = FindNodeReply{Contacts: kNearest}
 	return nil
 }
 
@@ -143,6 +157,10 @@ func (node *Node) String() string {
 // Return XOR distance between node and other
 func (node *Node) distanceTo(other *Contact) *big.Int {
 	return big.NewInt(0).Xor(&node.id, &other.Id)
+}
+
+func distanceBetween(firstId big.Int, secondId big.Int) *big.Int {
+	return big.NewInt(0).Xor(&firstId, &secondId)
 }
 
 // NewNode returns a new Node struct
@@ -161,7 +179,7 @@ func NewNode(address string) *Node {
 	node.id = *big.NewInt(0)
 	node.id.SetBytes(hash[:])
 	// TODO: take in k and tRefresh arguments - for now just hardcoding default
-	node.rt = NewRoutingTable(node, 20, 3600)
+	node.rt = NewRoutingTable(node)
 
 	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
 
@@ -256,35 +274,38 @@ func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 	if !node.doRPC("Store", dest, args, &reply) {
 		return
 	}
-
-	// TODO: Whatever processing we need to perform afterwards
-	// TODO: Update K-Buckets
 }
 
 // Send a FINDVALUE RPC for key to dest
-// TODO: Return diagnostic information
-func (node *Node) doFindValue(key string, dest net.TCPAddr) {
+func (node *Node) doFindValue(key string, dest net.TCPAddr) []byte {
 	args := FindValueArgs{node.addr, key}
-	var reply FindNodeReply
+	var reply FindValueReply
 
 	if !node.doRPC("FindValue", dest, args, &reply) {
-		return
+		return nil
 	}
 
-	// TODO: Whatever processing we need to perform afterwards
-	// TODO: Update K-Buckets
+	// Update K-Buckets
+	for _, contact := range reply.Contacts {
+		node.rt.add(contact)
+	}
+
+	return reply.Val
+
 }
 
 // Send a FINDNODE RPC for key to dest
-// TODO: Return diagnostic information
-func (node *Node) doFindNode(key string, dest net.TCPAddr) {
-	args := FindNodeArgs{node.addr, key}
+func (node *Node) doFindNode(dest net.TCPAddr) []Contact {
+	args := FindNodeArgs{node.addr}
 	var reply FindNodeReply
-
 	if !node.doRPC("FindNode", dest, args, &reply) {
-		return
+		return nil
 	}
 
-	// TODO: Whatever processing we need to perform afterwards
-	// TODO: Update K-Buckets
+	// Update K-Buckets
+	for _, contact := range reply.Contacts {
+		node.rt.add(contact)
+	}
+
+	return reply.Contacts
 }

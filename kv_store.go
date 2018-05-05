@@ -17,11 +17,11 @@ func NewKVStore() *KVStore {
 	return kvStore
 }
 
-func (self *KVStore) get(key string) []byte {
+func (self *KVStore) get(key string) ([]byte, bool) {
 	if val, ok := self.ht[key]; ok {
-		return val
+		return val, true
 	}
-	return nil
+	return nil, false
 }
 
 // Will overwrite existing value

@@ -1,173 +1,105 @@
 package kademlia
 
 import (
-	"container/list"
-	"crypto/sha1"
-	"math/big"
 	"net"
+	"sort"
+	"sync"
 )
 
-// TODO: The naming conventions are atrocious
-// An entry in the k-bucket
-type Contact struct {
-	Id   big.Int
-	Addr net.TCPAddr
+// This file contains the iterative RPCs used for information progagation throughout nodes
+// Calls STORE RPC on k Contacts ( Don't call on self?)
+func (node *Node) doIterativeStore(key string, value []byte, dest net.TCPAddr) {
+	shortlist := node.doIterativeFindNode(dest)
+
+	// get k contacts and send STORE RPC to each
+	for _, contact := range shortlist {
+		go func() {
+			args := StoreArgs{node.addr, key, value}
+			var reply StoreReply
+			if !node.doRPC("Store", contact.Addr, args, &reply) {
+				return
+			}
+		}()
+	}
 }
 
-// Create a new Contact struct based on addr by taking the hash
-func NewContact(addr net.TCPAddr) *Contact {
-	hash := sha1.Sum([]byte(addr.String()))
+func (node *Node) doIterativeFindValue(key string, dest net.TCPAddr) []byte {
+	args := FindValueArgs{node.addr, key}
+	var reply FindNodeReply
 
-	id := *big.NewInt(0)
-	id.SetBytes(hash[:])
-
-	nodeEntry := Contact{id, addr}
-	return &nodeEntry
-}
-
-// Returns true if contact Id and Addr are equivalent
-// structs can be compared, but structs containing big.Int cannot
-func AreEqualContacts(a *Contact, b *Contact) bool {
-	return (a.Id.Cmp(&b.Id) == 0)
-}
-
-// extra struct because we will want to implement split bucket
-type RoutingTable struct {
-	owner    *Node
-	kBuckets []*KBucket
-	k        int
-	tRefresh int
-}
-
-func NewRoutingTable(owner *Node, k int, tRefresh int) *RoutingTable {
-	kBuckets := make([]*KBucket, 160)
-	rt := RoutingTable{owner, kBuckets, k, tRefresh}
-	return &rt
-}
-
-// section 2.4 Kademlia protocol splits bucket when full and range includes own ID
-// TODO
-func (self *RoutingTable) splitBucket() {
-}
-
-//TODO
-func (self *RoutingTable) findContact() {
-
-}
-
-// ContactFromID returns the contact that belongs to id if it exists and nil if
-// it doesn't
-func (table *RoutingTable) ContactFromID(id big.Int) *Contact {
-	contact := Contact{id, net.TCPAddr{}}
-
-	// find the bucket it should be in
-	// if the bucket has been allocated (isn't nil), see if it's
-	// in the list
-
-	index := table.owner.GetKBucketFromId(&id)
-	table.owner.logger.Printf("Index is %d", index)
-	kbucket := table.kBuckets[index]
-
-	if (kbucket != nil) {
-		table.owner.logger.Printf("Found a kbucket")
-		result := kbucket.getFromList(contact)
-		if (result != nil) {
-			toReturn := result.Value.(Contact)
-			return &toReturn
-		}
-	} else {
+	if !node.doRPC("FindValue", dest, args, &reply) {
 		return nil
 	}
+
+	// TODO: If we find the value, STORE RPC sent to closest contact that did not return value
 	return nil
 }
 
-func (self *RoutingTable) add(contact Contact) {
-	index := self.owner.GetKBucketFromAddr(contact.Addr)
-	self.owner.logger.Printf("Adding node to bucket %d", index)	
-	if self.kBuckets[index] == nil {
-		self.owner.logger.Printf("Creating bucket %d", index)	
-		self.kBuckets[index] = NewKBucket(20)
-	}
-	self.kBuckets[index].addContact(contact)
-	self.owner.logger.Printf("Bucket after add: %v", self.kBuckets[index].contacts)
-	//TODO: handle failure to add
-}
+// Iteratively send a FINDNODE RPC
+// Returns a shortlist of k closest nodes
+func (node *Node) doIterativeFindNode(dest net.TCPAddr) []Contact {
+	//Iterations continue until no contacts returned that are closer or if all contacts in shortlist are active (k contacts have been queried)
+	toFind := NewContact(dest)
+	contacted := make(map[string]bool)
+	shortlist := make([]Contact, 0, 20)
 
-func (self *RoutingTable) remove(contact Contact) {
-	index := self.owner.GetKBucketFromAddr(contact.Addr)
-	self.kBuckets[index].removeContact(contact)
-}
+	// Get nearest from own RT - a bit weird to do through RPCs for self though
+	shortlist = node.doFindNode(dest)
 
-// Not even sure if we will use this
-func (self *RoutingTable) clear() {
-	// Note that this sets slice capacity to 0
-	self.kBuckets = nil
-}
+	// while nearest contacts is not same, keep on iterating
+	for {
+		pinged := 0
+		for i := 0; i < len(shortlist); i++ {
+			contactChan := make(chan []Contact)
+			var wg sync.WaitGroup
+			wg.Add(alpha)
 
-type KBucket struct {
-	contacts list.List
-	k        int       // max number of contacts
-	lruCache list.List // not implemented yet but explained in section 4.1
-}
+			toPing := shortlist[i].Addr
+			_, exists := contacted[toPing.String()]
 
-func NewKBucket(k int) *KBucket {
-	contacts := *list.New()
-	lruCache := *list.New()
-	kBucket := KBucket{contacts, k, lruCache}
-	return &kBucket
-}
+			if exists {
+				continue
+			}
 
-// If bucket contains contact, returns ptr to element in list. Else, returns nil
-func (self *KBucket) getFromList(contact Contact) *list.Element {
-	
-	for e := self.contacts.Front(); e != nil; e = e.Next() {
-		curr, _ := e.Value.(Contact)
-		// TODO: handle error when element can't be cast to Contact
-		if AreEqualContacts(&curr, &contact) {
-			return e
+			go func(shortlist []Contact) {
+				defer wg.Done()
+				newShortlist := node.doFindNode(toPing)
+				contacted[toPing.String()] = true
+				pinged++
+
+				// update the shortlist
+				shortlist = append(shortlist, newShortlist...)
+				sort.Slice(shortlist, func(i, j int) bool {
+					iDist := float64(distanceBetween(toFind.Id, shortlist[i].Id).Uint64())
+					jDist := float64(distanceBetween(toFind.Id, shortlist[j].Id).Uint64())
+					return iDist < jDist
+				})
+
+				contactChan <- shortlist[:k]
+			}(shortlist)
+
+			// Wait for all rpcs to return
+			wg.Wait()
+
+			// Check if shortlist has any closer nodes
+			noCloser := 0
+			for s := range contactChan {
+				newClosestDist := float64(distanceBetween(toFind.Id, s[0].Id).Uint64())
+				currFarthestDist := float64(distanceBetween(toFind.Id, shortlist[len(shortlist)-1].Id).Uint64())
+				if newClosestDist >= currFarthestDist {
+					noCloser++
+				}
+			}
+
+			// Stop if already contacted k Contacts
+			if len(contacted) >= k {
+				shortlist = shortlist[:k]
+				return shortlist
+			}
+
+			if pinged >= 3 {
+				break
+			}
 		}
-	}
-	return nil
-}
-
-// Returns true if contact is added into bucket, false otherwise
-func (self *KBucket) addContact(contact Contact) bool {
-	// If contact exists, move to tail
-	element := self.getFromList(contact)
-	if element != nil {
-		self.contacts.MoveToFront(element)
-		return true
-	} else {
-		// If bucket isn't full, add to tail
-		// list.Len() = O(1)
-		if self.contacts.Len() < self.k {
-			self.contacts.PushFront(contact)
-			return true
-		}
-		/* TODO: Deal when with buckets are full
-		// Otherwise, ping least-recently seen node
-		lruNode := self.contacts.Front()
-		// ping node... sigh this is gnna be ugly.
-		if true {
-			// If no response, node is evicted and new sender is inserted at tail
-			self.contacts.Remove(lruNode)
-			self.contacts.PushBack(contact)
-			return true
-		}
-		// implement replacement cache
-		return false
-		*/
-		return false
-	}
-}
-
-// Returns true if contact exists, false otherwise
-func (self *KBucket) removeContact(contact Contact) bool {
-	element := self.getFromList(contact)
-	if element != nil {
-		self.contacts.Remove(element)
-		return true
-	} else {
-		return false
 	}
 }
