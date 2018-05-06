@@ -14,7 +14,6 @@ Usage:
     Options:
         --zipf <alpha>              Use zipfian distribution
         --uniform                   Use uniform distribution (--linear 1)
-        --exponential <k>           Use exponential distribution
         --linear <m>                Use linear distribution
         --size <size>               How large to make the values (in bytes) [default: 128]
         -n <times>                  Number of times to test [default: 100]
