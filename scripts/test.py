@@ -24,7 +24,7 @@ Usage:
 """
 
 from kademlia import KademliaNode
-from zipf import Zipf
+from distributions import Zipf
 from docopt import docopt
 import sys
 
