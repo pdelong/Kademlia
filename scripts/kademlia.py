@@ -23,8 +23,8 @@ class KademliaNode:
     def __init__(self, address):
         self.address = address
 
-    def store(self, key, value):
-        requests.post("http://{}/store/{}".format(self.address, key), data=value)
+    def store_here(self, key, value):
+        requests.post("http://{}/store_here/{}".format(self.address, key), data=value)
 
     def ping(self, target, byid):
         if byid:
@@ -52,7 +52,7 @@ class KademliaNode:
 
         requests.get(url)
 
-    def findvalue(self, key, oneshot):
+    def findvalue(self, key, oneshot=True):
         if oneshot:
             method = "oneshot"
         else:
@@ -66,9 +66,12 @@ class KademliaNode:
         r = requests.get("http://{}/table".format(self.address))
         table = json.loads(r.text)
 
+        new_table = {}
         for entry in table:
             key = entry['key']
             value = base64.b64decode(entry['value'])
             isOrigin = entry['isOrigin']
 
-            print("key: {}, value: {}, isOrigin: {}".format(key, value, isOrigin))
+            new_table[key] = {'value': value, 'isOrigin': isOrigin}
+
+        return new_table

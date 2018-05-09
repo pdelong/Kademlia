@@ -1,6 +1,7 @@
 package kademlia
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -89,7 +90,28 @@ func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error reading value")
 	}
 
-	node.logger.Printf("Received STORE for key: (%s), value: (%s)", key, value)
+	encoded := base64.StdEncoding.EncodeToString(value)
+	node.logger.Printf("Received STORE for key: (%s), value: (%s)", key, encoded)
+
+	// TODO: FindNode
+	// TODO: Store
+
+	fmt.Fprintf(w, "Successfully stored key (%s)", key)
+}
+
+func (node *Node) handleStoreHere(w http.ResponseWriter, r *http.Request) {
+	if !checkMethod([]string{"POST"}, r, w) {
+		return
+	}
+
+	key := r.URL.Path[len("/store_here/"):]
+	value, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		fmt.Fprintf(w, "Error reading value")
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(value)
+	node.logger.Printf("Received STORE_HERE for key: (%s), value: (%s)", key, encoded)
 
 	node.ht.add(key, value, true)
 
@@ -197,6 +219,14 @@ func (node *Node) setupControlEndpoints() {
 	// GET /ping/id/<id>
 	http.HandleFunc("/ping/id/", func(w http.ResponseWriter, r *http.Request) {
 		node.handlePingID(w, r)
+	})
+
+	// Handle request to store (key,value) in the DHT
+	// This node becomes the originator
+	// POST /store_here/<key>
+	// Body is raw value
+	http.HandleFunc("/store_here/", func(w http.ResponseWriter, r *http.Request) {
+		node.handleStoreHere(w, r)
 	})
 
 	// Handle request to store (key,value) in the DHT

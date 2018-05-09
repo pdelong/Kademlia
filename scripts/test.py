@@ -7,7 +7,7 @@ Usage:
     test.py <addr> findvalue (iterative | oneshot) <target>
     test.py <addr> shutdown
     test.py <addr> table
-    test.py test [--zipf <alpha> | --uniform | --linear <m>] [-n <times>] [--size <size>] <nodes>...
+    test.py test [--zipf <alpha> | --uniform | --linear <m>] [--times <times>] [--keys <keys>] [--size <size>] <nodes>...
     test.py (-h | --help)
     test.py --version
 
@@ -16,19 +16,31 @@ Usage:
         --uniform                   Use uniform distribution (--linear 1)
         --linear <m>                Use linear distribution
         --size <size>               How large to make the values (in bytes) [default: 128]
-        -n <times>                  Number of times to test [default: 100]
+        -t --times <times>          Number of times to test [default: 100]
+        -n --keys <keys>            Number of keys to insert [default: 1000]
         -h --help                   Show this screen
         --version                   Show version
         -v                          Show extra debug information
 """
 
 from kademlia import KademliaNode
-from distributions import Zipf
+from distributions import Zipf, Uniform, Linear
 from docopt import docopt
 import sys
+import os
+import random
 
-def get_distribution(arguments):
-    pass
+def get_distribution(arguments, keys):
+    if arguments['--zipf'] is not None:
+        distribution = Zipf(keys, int(arguments['--zipf']))
+    elif arguments['--uniform']:
+        distribution = Uniform(keys)
+    elif arguments['--linear'] is not None:
+        distribution = Linear(keys, int(arguments['--linear']))
+    else:
+        distribution = Zipf(keys, 1)
+
+    return distribution
 
 
 if __name__ == '__main__':
@@ -60,8 +72,33 @@ if __name__ == '__main__':
         node.table()
     elif arguments['test']:
         nodes = [KademliaNode(addr) for addr in arguments['<nodes>']]
-        distribution = get_distribution(arguments)
-        for i in range(int(arguments['-n'])):
-            print(i)
-            # Query nodes repeatedly with the given key distribution
-        pass
+        num_keys = int(arguments['--keys'])
+        keys = list(range(num_keys))
+        distribution = get_distribution(arguments, keys)
+        size = int(arguments['--size'])
+
+        values = {}
+        for i in keys:
+            values[i] = os.urandom(size)
+
+        storage_node = nodes[0]
+        print('Using {} as the main node for storage setup'.format(storage_node.address))
+
+        # Store values on the appropriate nodes
+        for key, value in values.items():
+            print("Storing {}".format(key))
+            storage_node.store(key, value)
+
+        table = storage_node.table()
+        print(table)
+        for key, value in storage_node.table().items():
+            print("{}: {}".format(key, value))
+
+        for i in range(int(arguments['--times'])):
+            key = distribution.next()
+            node = random.choice(nodes)
+            value = node.findvalue(key)
+
+            if value != values[key]:
+                print("Value returned for {} but did not equal expected value".format(key))
+
