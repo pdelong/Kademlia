@@ -7,7 +7,7 @@ Usage:
     test.py <addr> findvalue (iterative | oneshot) <target>
     test.py <addr> shutdown
     test.py <addr> table
-    test.py test [--zipf <alpha> | --uniform | --exponential <k> | --linear <m>] [-n <times>] [--size <size>] <nodes>...
+    test.py test [--zipf <alpha> | --uniform | --linear <m>] [-n <times>] [--size <size>] <nodes>...
     test.py (-h | --help)
     test.py --version
 
