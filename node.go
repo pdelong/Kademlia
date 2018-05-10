@@ -286,7 +286,7 @@ func (node *Node) doStore(key string, value []byte, dest net.TCPAddr) {
 }
 
 // Send a FINDVALUE RPC for key to dest
-func (node *Node) doFindValue(key string, dest net.TCPAddr) []byte {
+func (node *Node) doFindValue(key string, dest net.TCPAddr) *FindValueReply {
 	args := FindValueArgs{node.addr, key}
 	var reply FindValueReply
 
@@ -299,13 +299,12 @@ func (node *Node) doFindValue(key string, dest net.TCPAddr) []byte {
 		node.rt.add(contact)
 	}
 
-	return reply.Val
-
+	return &reply
 }
 
 // Send a FINDNODE RPC for key to dest
-func (node *Node) doFindNode(dest net.TCPAddr, node_key string) []Contact {
-	args := FindNodeArgs{node.addr, node_key}
+func (node *Node) doFindNode(nodeKey string, dest net.TCPAddr) []Contact {
+	args := FindNodeArgs{node.addr, nodeKey}
 	var reply FindNodeReply
 	if !node.doRPC("FindNode", dest, args, &reply) {
 		return nil
