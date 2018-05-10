@@ -64,7 +64,7 @@ if __name__ == '__main__':
     elif arguments['findnode']:
         id = arguments['<target>']
         print("Going to find node with id: {}".format(id))
-        node.findnode(id, "iterative")
+        node.findnode(id, arguments['oneshot'])
     elif arguments['findvalue']:
         pass
     elif arguments['shutdown']:

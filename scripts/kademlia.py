@@ -50,7 +50,12 @@ class KademliaNode:
 
         url = "http://{}/{}/findnode/{}".format(self.address, method, target)
 
-        requests.get(url)
+        r = requests.get(url)
+        contacts = json.loads(r.text)
+        for entry in contacts:
+            key = entry['Id']
+            addr = entry['Addr']
+            print("%x %s"%(key, addr))
 
     def findvalue(self, key, oneshot=True):
         if oneshot:
