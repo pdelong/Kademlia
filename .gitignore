@@ -1,3 +1,9 @@
+############
+# Kademlia #
+############
+cmd/kademlia_node/kademlia_node
+log/*.log
+
 ##########
 # Python #
 ##########
