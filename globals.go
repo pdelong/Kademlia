@@ -24,4 +24,4 @@ const alpha = 3
 const k = 20
 
 // keys should be stored as hex when in string form
-const key_base = 16
+const keyBase = 16

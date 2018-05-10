@@ -24,14 +24,6 @@ func (node *Node) doIterativeStore(key string, value []byte) {
 }
 
 func (node *Node) doIterativeFindValue(key string, dest net.TCPAddr) []byte {
-	args := FindValueArgs{node.addr, key}
-	var reply FindNodeReply
-
-	if !node.doRPC("FindValue", dest, args, &reply) {
-		return nil
-	}
-
-	// TODO: If we find the value, STORE RPC sent to closest contact that did not return value
 	return nil
 }
 
@@ -39,15 +31,15 @@ func (node *Node) doIterativeFindValue(key string, dest net.TCPAddr) []byte {
 // Returns a shortlist of k closest nodes
 func (node *Node) doIterativeFindNode(key string) []Contact {
 	//Iterations continue until no contacts returned that are closer or if all contacts in shortlist are active (k contacts have been queried)
-	toFindId := new(big.Int)
-	toFindId.SetString(key, key_base)
+	toFindID := new(big.Int)
+	toFindID.SetString(key, keyBase)
 	contacted := make(map[string]bool)
 	shortlist := make([]Contact, 0, k)
 
 	// add yourself to contacted
 	contacted[node.addr.String()] = true
 
-	shortlist = node.rt.findKNearestContacts(node.id)
+	shortlist = node.rt.findKNearestContacts(*toFindID)
 	node.logger.Printf("Found %d contacts", len(shortlist))
 
 	contactChan := make(chan []Contact)
@@ -68,7 +60,7 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 			}
 			toSend = append(toSend, shortlist[i])
 			found++
-			if (found == alpha) {
+			if found == alpha {
 				break
 			}
 		}
@@ -82,15 +74,15 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 
 				// update the shortlist
 				sort.Slice(responseShortlist, func(i, j int) bool {
-					iDist := distanceBetween(*toFindId, responseShortlist[i].Id)
-					jDist := distanceBetween(*toFindId, responseShortlist[j].Id)
+					iDist := distanceBetween(*toFindID, responseShortlist[i].Id)
+					jDist := distanceBetween(*toFindID, responseShortlist[j].Id)
 					return (iDist.Cmp(jDist) == -1)
 				})
-				slice_index := k
-				if (len(responseShortlist) < k) {
-					slice_index = len(responseShortlist)
+				sliceIndex := k
+				if len(responseShortlist) < k {
+					sliceIndex = len(responseShortlist)
 				}
-				contactChan <- responseShortlist[:slice_index]
+				contactChan <- responseShortlist[:sliceIndex]
 			}()
 		}
 
@@ -101,11 +93,11 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 		node.logger.Printf("Going to read from channel")
 		for i := 0; i < len(toSend); i++ {
 			s := <-contactChan
-			newClosestDist := distanceBetween(*toFindId, s[0].Id)
-			if (len(updatedShortlist) > 0) {
-				currClosestDist := distanceBetween(*toFindId, updatedShortlist[0].Id)
+			newClosestDist := distanceBetween(*toFindID, s[0].Id)
+			if len(updatedShortlist) > 0 {
+				currClosestDist := distanceBetween(*toFindID, updatedShortlist[0].Id)
 				// if newClosestDist < currClosestDist
-				if (newClosestDist.Cmp(currClosestDist) == -1) { 
+				if newClosestDist.Cmp(currClosestDist) == -1 {
 					closer++
 				}
 			}
@@ -114,15 +106,15 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 			node.logger.Printf("Update: list length: %d\n", len(updatedShortlist))
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
-				iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
-				jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
+				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
+				jDist := distanceBetween(*toFindID, updatedShortlist[j].Id)
 				return (iDist.Cmp(jDist) == -1)
 			})
-			slice_index := k
-			if (len(updatedShortlist) < k) {
-				slice_index = len(updatedShortlist)
+			sliceIndex := k
+			if len(updatedShortlist) < k {
+				sliceIndex = len(updatedShortlist)
 			}
-			updatedShortlist = updatedShortlist[:slice_index]
+			updatedShortlist = updatedShortlist[:sliceIndex]
 		}
 
 		node.logger.Printf("Finished reading from channel")
@@ -139,19 +131,19 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 					sendingTo = append(sendingTo, shortlist[i])
 				}
 			}
-			responseShortlist := node.findNodeToK(toFindId, sendingTo)
+			responseShortlist := node.findNodeToK(toFindID, sendingTo)
 			updatedShortlist = append(updatedShortlist, responseShortlist...)
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
-				iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
-				jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
+				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
+				jDist := distanceBetween(*toFindID, updatedShortlist[j].Id)
 				return (iDist.Cmp(jDist) == -1)
 			})
-			slice_index := k
-			if (len(updatedShortlist) < k) {
-				slice_index = len(updatedShortlist)
+			sliceIndex := k
+			if len(updatedShortlist) < k {
+				sliceIndex = len(updatedShortlist)
 			}
-			updatedShortlist = updatedShortlist[:slice_index]
+			updatedShortlist = updatedShortlist[:sliceIndex]
 		}
 
 		node.logger.Printf("Checking if shortlist has changed")
@@ -160,11 +152,11 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 		// comparing shortlist and updatedShortlist
 		node.logger.Printf("New shortlist has length %d", len(updatedShortlist))
 		changed = false
-		loop_index := len(updatedShortlist)
-		if (len(shortlist) < loop_index) {
-			loop_index = len(shortlist)
+		loopIndex := len(updatedShortlist)
+		if len(shortlist) < loopIndex {
+			loopIndex = len(shortlist)
 		}
-		for i := 0; i < loop_index; i++ {
+		for i := 0; i < loopIndex; i++ {
 			if updatedShortlist[i].Addr.String() != shortlist[i].Addr.String() {
 				changed = true
 			}
@@ -177,16 +169,17 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 		shortlist = updatedShortlist
 
 	}
+
 	return shortlist
 }
 
-func (node *Node) findNodeToK(toFindId *big.Int, toSend []Contact) []Contact {
+func (node *Node) findNodeToK(toFindID *big.Int, toSend []Contact) []Contact {
 	contactChan := make(chan []Contact)
 
 	for i := 0; i < len(toSend); i++ {
 		toPing := toSend[i].Addr
 		go func() {
-			responseShortlist := node.doFindNode(toPing, toFindId.Text(key_base))
+			responseShortlist := node.doFindNode(toPing, toFindID.Text(keyBase))
 
 			contactChan <- responseShortlist
 		}()
@@ -199,16 +192,16 @@ func (node *Node) findNodeToK(toFindId *big.Int, toSend []Contact) []Contact {
 		updatedShortlist = append(updatedShortlist, s...)
 		// update the shortlist
 		sort.Slice(updatedShortlist, func(i, j int) bool {
-			iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
-			jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
+			iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
+			jDist := distanceBetween(*toFindID, updatedShortlist[j].Id)
 			return (iDist.Cmp(jDist) == -1)
 		})
-		slice_index := k
-		if (len(updatedShortlist) < k) {
-			slice_index = len(updatedShortlist)
+		sliceIndex := k
+		if len(updatedShortlist) < k {
+			sliceIndex = len(updatedShortlist)
 		}
-		updatedShortlist = updatedShortlist[:slice_index]
+		updatedShortlist = updatedShortlist[:sliceIndex]
 	}
-	
+
 	return updatedShortlist
 }

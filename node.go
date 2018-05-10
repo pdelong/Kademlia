@@ -124,13 +124,15 @@ func (node *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 	node.rt.add(*contact)
 	// If node contains key, returns associated data
 	if val, ok := node.ht.get(args.Key); ok {
-		*reply = FindValueReply{Contacts: nil, Val: val}
+		*reply = FindValueReply{Val: val}
 		return nil
 	}
 
 	// Otherwise, return set of k triples (equiv. to FindNode)
-	nearest := node.rt.findKNearestContacts(contact.Id)
-	*reply = FindValueReply{Contacts: nearest, Val: nil}
+	toFindID := new(big.Int)
+	toFindID.SetString(args.Key, keyBase)
+	nearest := node.rt.findKNearestContacts(*toFindID)
+	*reply = FindValueReply{Contacts: nearest}
 	return nil
 }
 
