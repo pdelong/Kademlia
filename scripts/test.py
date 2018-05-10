@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Kademlia Test Script
 
 Usage:
