@@ -9,16 +9,15 @@ import (
 
 func RemoveDupesFromShortlist(contacts []Contact) []Contact {
 	// make a map from the list
-	undupe_map := make(map[string]Contact)
+	undupe_map := make(map[string]bool)
+	unduped_slice := make([]Contact, 0, len(contacts))
 	for i := 0; i < len(contacts); i++ {
 		curr := contacts[i]
-		undupe_map[curr.Addr.String()] = curr
-	}
-
-	// reconvert to slice
-	unduped_slice := make([]Contact, 0, len())
-	for key, value := range undupe_map {
-		unduped_slice = append(unduped_slice, value)
+		_, exist := undupe_map[curr.Addr.String()]
+		if !exist {
+			unduped_slice = append(unduped_slice, curr)
+			undupe_map[curr.Addr.String()] = true
+		}
 	}
 
 	return unduped_slice
