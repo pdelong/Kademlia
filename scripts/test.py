@@ -62,11 +62,13 @@ if __name__ == '__main__':
     elif arguments['ping']:
         pass
     elif arguments['findnode']:
-        id = arguments['<target>']
-        print("Going to find node with id: {}".format(id))
-        node.findnode(id, arguments['oneshot'])
+        key = arguments['<target>']
+        print("Going to find node with id: {}".format(key))
+        node.findnode(key, arguments['oneshot'])
     elif arguments['findvalue']:
-        pass
+        key = arguments['<target>']
+        print("Looking for value with id: {}".format(key))
+        node.findvalue(key, arguments['oneshot'])
     elif arguments['shutdown']:
         print("Attempting to shut down node")
         node.shutdown()

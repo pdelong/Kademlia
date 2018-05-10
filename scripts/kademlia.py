@@ -65,7 +65,9 @@ class KademliaNode:
 
         url = "http://{}/{}/findvalue/{}".format(self.address, method, key)
 
-        requests.get(url)
+        r = requests.get(url)
+        value = json.loads(r.text)
+        print("Got value back: ", value)
 
     def table(self):
         r = requests.get("http://{}/table".format(self.address))

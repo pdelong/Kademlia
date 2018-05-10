@@ -166,18 +166,15 @@ func (node *Node) handleOneshotFindValue(w http.ResponseWriter, r *http.Request)
 }
 
 func (node *Node) handleIterativeFindNode(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/iterative/findnode/"):]
-	node.logger.Printf("Node got REST FindNode request for ID %s", id)
 	if !checkMethod([]string{"GET"}, r, w) {
 		return
 	}
+	id := r.URL.Path[len("/iterative/findnode/"):]
+	node.logger.Printf("Node got REST FindNode request for ID %s", id)
 
-	// TODO: Check for valid id
 	contacts := node.doIterativeFindNode(id)
 	enc := json.NewEncoder(w)
 	enc.Encode(contacts)
-	// TODO: Perform necessary stuff
-	// TODO: Send back response
 }
 
 func (node *Node) handleIterativeFindValue(w http.ResponseWriter, r *http.Request) {
@@ -186,11 +183,12 @@ func (node *Node) handleIterativeFindValue(w http.ResponseWriter, r *http.Reques
 	}
 
 	key := r.URL.Path[len("/iterative/findvalue/"):]
+	node.logger.Printf("Node got REST FindValue request for ID %s", id)
 
-	// TODO: Check for valid key
-	// TODO: Perform necessary stuff
-	// TODO: Send back response
-	fmt.Fprintf(w, "Called FINDVALUE for value %s", key)
+	value := node.doIterativeFindValue(id)
+	enc := json.NewEncoder(w)
+	enc.Encode(value)
+
 }
 
 func (node *Node) handleShutdown(w http.ResponseWriter, r *http.Request) {
