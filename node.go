@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
-	"time"
+	//"time"
 )
 
 // Node is an individual Kademlia node
@@ -58,7 +58,7 @@ type FindValueReply struct {
 // FindNodeArgs contains the arguments for the FINDNODE RPC
 type FindNodeArgs struct {
 	Source net.TCPAddr
-	//Key    string
+	Key    string
 }
 
 // FindNodeReply contains the results for the FINDNODE RPC
@@ -96,7 +96,7 @@ func (node *Node) checkRoutingTable(dest net.TCPAddr) {
 	}
 	node.logger.Printf("Printing node info")
 
-	node.logger.Printf("Id: %s, addr: %s", contact.Id.String(), contact.Addr.String())
+	node.logger.Printf("Id: %s, addr: %s", contact.Id.Text(key_base), contact.Addr.String())
 }
 
 // Store is the handler for the STORE RPC
@@ -136,20 +136,25 @@ func (node *Node) FindValue(args FindValueArgs, reply *FindValueReply) error {
 
 // FindNode is the handler for the FINDNODE RPC
 func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
+	node.logger.Printf("FindNode from %s", args.Source.String())
 	contact := NewContact(args.Source)
 	if contact == nil {
 		return errors.New("Couldn't hash IP address")
 	}
 	node.rt.add(*contact)
 
-	nearest := node.rt.findKNearestContacts(contact.Id)
+	key_int := new(big.Int)
+	key_int.SetString(args.Key, key_base)
+
+	nearest := node.rt.findKNearestContacts(*key_int)
 	*reply = FindNodeReply{Contacts: nearest}
+	node.logger.Printf("Processed FindNode from %s", args.Source.String())
 	return nil
 }
 
 func (node *Node) String() string {
 	return fmt.Sprintf("Node: (id = %s) (address = %s) (kBuckets = %v)",
-		node.id.String(),
+		node.id.Text(key_base),
 		node.addr.String(),
 		node.rt)
 }
@@ -204,20 +209,22 @@ func (node *Node) Run(toPing string) {
 			node.logger.Printf("%s", err)
 		}
 
-		// periodically ping
-		ticker := time.NewTicker(1 * time.Second)
-		counter := 0
-		go func() {
-			for range ticker.C {
-				node.doPing(*toPingAddr)
-				counter++
-				if counter == 1 {
-					os.Exit(1)
-				}
-			}
-		}()
+		contact := NewContact(*toPingAddr)
+
+		node.rt.add(*contact)
+		// get k closest nodes and add to routing table by querying
+		// own id
+		kclosest := node.doIterativeFindNode(node.id.Text(key_base))
+		for i := 0; i < len(kclosest); i++ {
+			curr := kclosest[i]
+			node.logger.Printf("Got node %s with ID %s", curr.Addr.String(), curr.Id.String())
+			node.rt.add(curr)
+		}
+
+		// fill k buckets further away :w
 	}
 
+	node.logger.Printf("Finished routing table initialization")
 	// open our own port for connection
 	l, e := net.ListenTCP("tcp", &node.addr)
 	if e != nil {
@@ -295,8 +302,8 @@ func (node *Node) doFindValue(key string, dest net.TCPAddr) []byte {
 }
 
 // Send a FINDNODE RPC for key to dest
-func (node *Node) doFindNode(dest net.TCPAddr) []Contact {
-	args := FindNodeArgs{node.addr}
+func (node *Node) doFindNode(dest net.TCPAddr, node_key string) []Contact {
+	args := FindNodeArgs{node.addr, node_key}
 	var reply FindNodeReply
 	if !node.doRPC("FindNode", dest, args, &reply) {
 		return nil

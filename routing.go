@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"net"
 	"sort"
-	"sync"
 )
 
 // This file contains the iterative RPCs used for information progagation throughout nodes
@@ -43,30 +42,42 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 	toFindId := new(big.Int)
 	toFindId.SetString(key, key_base)
 	contacted := make(map[string]bool)
-	shortlist := make([]Contact, 0, 20)
+	shortlist := make([]Contact, 0, k)
+
+	// add yourself to contacted
+	contacted[node.addr.String()] = true
 
 	shortlist = node.rt.findKNearestContacts(node.id)
+	node.logger.Printf("Found %d contacts", len(shortlist))
 
+	contactChan := make(chan []Contact)
 	// while nearest contacts is not same, keep on iterating
 	for {
-		pinged := 0
+		node.logger.Printf("Starting a new round of FindNodes")
+		found := 0
 		changed := false
-		for i := 0; i < len(shortlist); i++ {
-			contactChan := make(chan []Contact)
-			var wg sync.WaitGroup
-			wg.Add(alpha)
+		toSend := make([]Contact, 0, alpha)
 
+		// find alpha to contact
+		for i := 0; i < len(shortlist); i++ {
 			toPing := shortlist[i].Addr
 			_, exists := contacted[toPing.String()]
 
 			if exists {
 				continue
 			}
+			toSend = append(toSend, shortlist[i])
+			found++
+			if (found == alpha) {
+				break
+			}
+		}
 
-			pinged++
+		// send alpha (or maybe fewer) RPCs
+		for i := 0; i < len(toSend); i++ {
+			toPing := toSend[i].Addr
 			go func() {
-				defer wg.Done()
-				responseShortlist := node.doFindNode(toPing)
+				responseShortlist := node.doFindNode(toPing, key)
 				contacted[toPing.String()] = true
 
 				// update the shortlist
@@ -75,101 +86,116 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 					jDist := distanceBetween(*toFindId, responseShortlist[j].Id)
 					return (iDist.Cmp(jDist) == -1)
 				})
-				contactChan <- responseShortlist[:k]
+				slice_index := k
+				if (len(responseShortlist) < k) {
+					slice_index = len(responseShortlist)
+				}
+				contactChan <- responseShortlist[:slice_index]
 			}()
+		}
 
-			// Wait for all rpcs to return
-			wg.Wait()
-
-			// Check if shortlist has any closer nodes
-			noCloser := 0
-			updatedShortlist := make([]Contact, 0, 20)
-			copy(updatedShortlist, shortlist)
-
-			for s := range contactChan {
-				newClosestDist := distanceBetween(*toFindId, s[0].Id)
+		updatedShortlist := make([]Contact, len(shortlist), k)
+		copy(updatedShortlist, shortlist)
+		node.logger.Printf("Shortlist length %d", len(updatedShortlist))
+		closer := 0
+		node.logger.Printf("Going to read from channel")
+		for i := 0; i < len(toSend); i++ {
+			s := <-contactChan
+			newClosestDist := distanceBetween(*toFindId, s[0].Id)
+			if (len(updatedShortlist) > 0) {
 				currClosestDist := distanceBetween(*toFindId, updatedShortlist[0].Id)
-				// if newClosestDist >= currClosestDist
-				if (newClosestDist.Cmp(currClosestDist) == 0) ||
-					(newClosestDist.Cmp(currClosestDist) == 1) {
-					noCloser++
+				// if newClosestDist < currClosestDist
+				if (newClosestDist.Cmp(currClosestDist) == -1) { 
+					closer++
 				}
-
-				updatedShortlist = append(updatedShortlist, s...)
-				// update the shortlist
-				sort.Slice(updatedShortlist, func(i, j int) bool {
-					iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
-					jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
-					return (iDist.Cmp(jDist) == -1)
-				})
-				updatedShortlist = updatedShortlist[:k]
 			}
 
-			// if we didn't find anything closer in last round, ping the rest of the
-			// shortlist that are unseen
-			if noCloser == alpha {
-				sendingTo := make([]Contact, 0, 20)
-				for i := 0; i < len(shortlist); i++ {
-					toPing := shortlist[i].Addr
-					_, exists := contacted[toPing.String()]
-
-					if !exists {
-						sendingTo = append(sendingTo, shortlist[i])
-					}
-				}
-				responseShortlist := node.findNodeToK(toFindId, sendingTo)
-				updatedShortlist = append(updatedShortlist, responseShortlist...)
-				// update the shortlist
-				sort.Slice(updatedShortlist, func(i, j int) bool {
-					iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
-					jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
-					return (iDist.Cmp(jDist) == -1)
-				})
-				updatedShortlist = updatedShortlist[:k]
+			updatedShortlist = append(updatedShortlist, s...)
+			node.logger.Printf("Update: list length: %d\n", len(updatedShortlist))
+			// update the shortlist
+			sort.Slice(updatedShortlist, func(i, j int) bool {
+				iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
+				jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
+				return (iDist.Cmp(jDist) == -1)
+			})
+			slice_index := k
+			if (len(updatedShortlist) < k) {
+				slice_index = len(updatedShortlist)
 			}
+			updatedShortlist = updatedShortlist[:slice_index]
+		}
 
-			// check if the shortlist has changed at all
-			// if not, we should terminate
-			// comparing shortlist and updatedShortlist
-			changed = false
+		node.logger.Printf("Finished reading from channel")
+
+		// if we didn't find anything closer in last round, ping the rest of the
+		// shortlist that are unseen
+		if closer == 0 {
+			sendingTo := make([]Contact, 0, k)
 			for i := 0; i < len(shortlist); i++ {
-				if updatedShortlist[i].Addr.String() != shortlist[i].Addr.String() {
-					changed = true
+				toPing := shortlist[i].Addr
+				_, exists := contacted[toPing.String()]
+
+				if !exists {
+					sendingTo = append(sendingTo, shortlist[i])
 				}
 			}
-			if !changed {
-				return updatedShortlist
+			responseShortlist := node.findNodeToK(toFindId, sendingTo)
+			updatedShortlist = append(updatedShortlist, responseShortlist...)
+			// update the shortlist
+			sort.Slice(updatedShortlist, func(i, j int) bool {
+				iDist := distanceBetween(*toFindId, updatedShortlist[i].Id)
+				jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
+				return (iDist.Cmp(jDist) == -1)
+			})
+			slice_index := k
+			if (len(updatedShortlist) < k) {
+				slice_index = len(updatedShortlist)
 			}
+			updatedShortlist = updatedShortlist[:slice_index]
+		}
 
-			shortlist = updatedShortlist
-
-			if pinged >= 3 {
-				break
+		node.logger.Printf("Checking if shortlist has changed")
+		// check if the shortlist has changed at all
+		// if not, we should terminate
+		// comparing shortlist and updatedShortlist
+		node.logger.Printf("New shortlist has length %d", len(updatedShortlist))
+		changed = false
+		loop_index := len(updatedShortlist)
+		if (len(shortlist) < loop_index) {
+			loop_index = len(shortlist)
+		}
+		for i := 0; i < loop_index; i++ {
+			if updatedShortlist[i].Addr.String() != shortlist[i].Addr.String() {
+				changed = true
 			}
 		}
+		node.logger.Println("Shortlist changed this round", changed)
+		if !changed {
+			return updatedShortlist
+		}
+
+		shortlist = updatedShortlist
+
 	}
 	return shortlist
 }
 
 func (node *Node) findNodeToK(toFindId *big.Int, toSend []Contact) []Contact {
 	contactChan := make(chan []Contact)
-	var wg sync.WaitGroup
-	wg.Add(len(toSend))
 
 	for i := 0; i < len(toSend); i++ {
 		toPing := toSend[i].Addr
 		go func() {
-			defer wg.Done()
-			responseShortlist := node.doFindNode(toPing)
+			responseShortlist := node.doFindNode(toPing, toFindId.Text(key_base))
 
 			contactChan <- responseShortlist
 		}()
 	}
 
 	// Wait for all rpcs to return
-	wg.Wait()
 	updatedShortlist := make([]Contact, 0)
-	for s := range contactChan {
+	for i := 0; i < len(toSend); i++ {
+		s := <-contactChan
 		updatedShortlist = append(updatedShortlist, s...)
 		// update the shortlist
 		sort.Slice(updatedShortlist, func(i, j int) bool {
@@ -177,7 +203,12 @@ func (node *Node) findNodeToK(toFindId *big.Int, toSend []Contact) []Contact {
 			jDist := distanceBetween(*toFindId, updatedShortlist[j].Id)
 			return (iDist.Cmp(jDist) == -1)
 		})
-		updatedShortlist = updatedShortlist[:k]
+		slice_index := k
+		if (len(updatedShortlist) < k) {
+			slice_index = len(updatedShortlist)
+		}
+		updatedShortlist = updatedShortlist[:slice_index]
 	}
+	
 	return updatedShortlist
 }

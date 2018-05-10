@@ -7,6 +7,8 @@ import (
 	"net"
 )
 
+
+
 // GetKBucketFromAddr returns the KBucket that would contain destAddr
 func (node *Node) GetKBucketFromAddr(destAddr net.TCPAddr) int {
 	hash := sha1.Sum([]byte(destAddr.String()))

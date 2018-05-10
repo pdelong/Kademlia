@@ -3,6 +3,7 @@ package kademlia
 import (
 	"container/list"
 	"crypto/sha1"
+	//"fmt"
 	"math/big"
 	"net"
 	"sort"
@@ -57,17 +58,27 @@ func (self *RoutingTable) splitBucket() {
 func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	// If the entire RT has less than k contacts, then just return all the contacts
 
-	kNearest := make([]Contact, k)
+	kNearest := make([]Contact, 0, k)
 	// To find the k closest contacts, we start looking from the bucket that the contact would be in
 	index := self.owner.GetKBucketFromID(&id)
-	copy(kNearest, self.kBuckets[index].getAllContacts())
+	if (index < 0) {
+		index = 0
+	}
+
+	// for all of these, need to check that the kbucket exists
+	if (self.kBuckets[index] != nil) {
+		self.owner.logger.Printf("Taking neighbor from non-nil bucket %d", index)
+		kNearest = append(kNearest, self.kBuckets[index].getAllContacts()...)
+	}
 
 	// If less than k contacts are in the bucket, then take the closest from the left
 	if len(kNearest) < k {
-		// 0th bucket never populated
-		for curr := index - 1; curr > 0; index-- {
+		// 0th bucket never populated <--- this is wrong, 1 is between 2^0 and 2^1
+		for curr := index - 1; curr >= 0; curr-- {
 			currBucket := self.kBuckets[curr]
-			kNearest = append(kNearest, currBucket.getAllContacts()...)
+			if (currBucket != nil) {
+				kNearest = append(kNearest, currBucket.getAllContacts()...)
+			}
 			if len(kNearest) >= k {
 				break
 			}
@@ -76,9 +87,12 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 
 	// Then go to the right
 	if len(kNearest) < k {
-		for curr := index + 1; curr < len(self.kBuckets); curr++ {
+		for curr := index + 1; curr < 160; curr++ {
 			currBucket := self.kBuckets[curr]
-			kNearest = append(kNearest, currBucket.getAllContacts()...)
+			if (currBucket != nil) {
+				self.owner.logger.Printf("Taking neighbor from non-nil bucket %d", curr)
+				kNearest = append(kNearest, currBucket.getAllContacts()...)
+			}
 			if len(kNearest) >= k {
 				break
 			}
@@ -86,17 +100,31 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	}
 
 	// Return in order of distance to contact
-	kNearest = kNearest[:k]
 	sort.Slice(kNearest, func(i, j int) bool {
-		aDist := float64(distanceBetween(id, kNearest[i].Id).Uint64())
-		bDist := float64(distanceBetween(id, kNearest[j].Id).Uint64())
-		return aDist < bDist
+		aDist := distanceBetween(id, kNearest[i].Id)
+		bDist := distanceBetween(id, kNearest[j].Id)
+		return (aDist.Cmp(bDist) == -1)
 	})
 
+	self.owner.logger.Printf("Finished sorting")
+	slice_index := k
+	if (len(kNearest) < k) {
+		slice_index = len(kNearest)
+	}
+	kNearest = kNearest[:slice_index]
+	
+	self.owner.logger.Printf("Found %d neighbors", len(kNearest))
 	return kNearest
 }
 
 func (self *RoutingTable) add(contact Contact) {
+	// Don't add yourself to the routing table under any circumstances
+	self_contact := Contact{self.owner.id, self.owner.addr}
+	self.owner.logger.Printf("My node ID: %s, other ID: %s", self.owner.id.Text(key_base), contact.Id.Text(key_base))
+	if (AreEqualContacts(&self_contact, &contact)) {
+		return
+	}
+
 	index := self.owner.GetKBucketFromAddr(contact.Addr)
 	self.owner.logger.Printf("Adding node to bucket %d", index)
 	if self.kBuckets[index] == nil {
@@ -104,7 +132,6 @@ func (self *RoutingTable) add(contact Contact) {
 		self.kBuckets[index] = NewKBucket(20)
 	}
 	self.kBuckets[index].addContact(contact)
-	self.owner.logger.Printf("Bucket after add: %v", self.kBuckets[index].contacts)
 	//TODO: handle failure to add
 }
 
@@ -120,14 +147,14 @@ func (self *RoutingTable) clear() {
 }
 
 type KBucket struct {
-	contacts list.List
+	contacts *list.List
 	k        int       // max number of contacts
-	lruCache list.List // not implemented yet but explained in section 4.1
+	lruCache *list.List // not implemented yet but explained in section 4.1
 }
 
 func NewKBucket(k int) *KBucket {
-	contacts := *list.New()
-	lruCache := *list.New()
+	contacts := list.New()
+	lruCache := list.New()
 	kBucket := KBucket{contacts, k, lruCache}
 	return &kBucket
 }
@@ -146,12 +173,10 @@ func (self *KBucket) getFromList(contact Contact) *list.Element {
 
 // Not nice, but need this functionality because contacts are a list
 func (self *KBucket) getAllContacts() []Contact {
-	contacts := make([]Contact, 20)
-	index := 0
+	contacts := make([]Contact, 0, 20)
 	for e := self.contacts.Front(); e != nil; e = e.Next() {
 		curr, _ := e.Value.(Contact)
-		contacts[index] = curr
-		index++
+		contacts = append(contacts, curr)
 	}
 	return contacts
 }
