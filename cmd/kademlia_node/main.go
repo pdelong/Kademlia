@@ -32,12 +32,17 @@ func main() {
 	// if this isn't a bootstrap node, read from a list of nodes in the system
 	bootstrapAddr := ""
 	if args[1] == "nb" {
-		file, err := os.Open("bootstrap_nodes_test")
-		checkIOError(err)
-		reader := bufio.NewReader(file)
-		bootstrapAddrBytes, _, err := reader.ReadLine()
-		checkIOError(err)
-		bootstrapAddr = string(bootstrapAddrBytes)
+		if len(args) < 3 {
+			file, err := os.Open("bootstrap_nodes_test")
+			checkIOError(err)
+			reader := bufio.NewReader(file)
+			bootstrapAddrBytes, _, err := reader.ReadLine()
+			checkIOError(err)
+			bootstrapAddr = string(bootstrapAddrBytes)
+		} else {
+			bootstrapAddr = args[2]
+		}
+
 		fmt.Println("Contacting ", bootstrapAddr)
 	}
 
