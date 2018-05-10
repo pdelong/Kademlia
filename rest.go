@@ -184,7 +184,7 @@ func (node *Node) handleIterativeFindValue(w http.ResponseWriter, r *http.Reques
 	}
 
 	key := r.URL.Path[len("/iterative/findvalue/"):]
-	node.logger.Printf("Node got REST FindValue request for key %s", key)
+	node.logger.Printf("Node got REST FindValue request for ID %s", key)
 
 	value := node.doIterativeFindValue(key)
 	enc := json.NewEncoder(w)

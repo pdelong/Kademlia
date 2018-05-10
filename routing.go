@@ -111,7 +111,7 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 			}
 
 			updatedShortlist = append(updatedShortlist, s...)
-			node.logger.Printf("Update: list length: %d\n", len(updatedShortlist))
+			updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
 				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
@@ -141,6 +141,7 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 			}
 			responseShortlist := node.findNodeToK(toFindID, sendingTo)
 			updatedShortlist = append(updatedShortlist, responseShortlist...)
+			updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
 				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
@@ -255,12 +256,15 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 
 			updatedShortlist = append(updatedShortlist, s...)
 			node.logger.Printf("Update: list length: %d\n", len(updatedShortlist))
+			updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
+			node.logger.Printf("Update: list length: %d\n", len(updatedShortlist))
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
 				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
 				jDist := distanceBetween(*toFindID, updatedShortlist[j].Id)
 				return (iDist.Cmp(jDist) == -1)
 			})
+
 			sliceIndex := k
 			if len(updatedShortlist) < k {
 				sliceIndex = len(updatedShortlist)
@@ -284,6 +288,7 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 			}
 			responseShortlist := node.findNodeToK(toFindID, sendingTo)
 			updatedShortlist = append(updatedShortlist, responseShortlist...)
+			updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
 				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
@@ -341,6 +346,7 @@ func (node *Node) findNodeToK(toFindID *big.Int, toSend []Contact) []Contact {
 	for i := 0; i < len(toSend); i++ {
 		s := <-contactChan
 		updatedShortlist = append(updatedShortlist, s...)
+		updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
 		// update the shortlist
 		sort.Slice(updatedShortlist, func(i, j int) bool {
 			iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
