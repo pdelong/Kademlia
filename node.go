@@ -96,7 +96,7 @@ func (node *Node) checkRoutingTable(dest net.TCPAddr) {
 	}
 	node.logger.Printf("Printing node info")
 
-	node.logger.Printf("Id: %s, addr: %s", contact.Id.Text(key_base), contact.Addr.String())
+	node.logger.Printf("Id: %s, addr: %s", contact.Id.Text(keyBase), contact.Addr.String())
 }
 
 // Store is the handler for the STORE RPC
@@ -146,7 +146,7 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	node.rt.add(*contact)
 
 	key_int := new(big.Int)
-	key_int.SetString(args.Key, key_base)
+	key_int.SetString(args.Key, keyBase)
 
 	nearest := node.rt.findKNearestContacts(*key_int)
 	*reply = FindNodeReply{Contacts: nearest}
@@ -156,7 +156,7 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 
 func (node *Node) String() string {
 	return fmt.Sprintf("Node: (id = %s) (address = %s) (kBuckets = %v)",
-		node.id.Text(key_base),
+		node.id.Text(keyBase),
 		node.addr.String(),
 		node.rt)
 }
@@ -216,7 +216,7 @@ func (node *Node) Run(toPing string) {
 		node.rt.add(*contact)
 		// get k closest nodes and add to routing table by querying
 		// own id
-		kclosest := node.doIterativeFindNode(node.id.Text(key_base))
+		kclosest := node.doIterativeFindNode(node.id.Text(keyBase))
 		for i := 0; i < len(kclosest); i++ {
 			curr := kclosest[i]
 			node.logger.Printf("Got node %s with ID %s", curr.Addr.String(), curr.Id.String())

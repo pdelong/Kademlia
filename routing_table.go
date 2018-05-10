@@ -59,12 +59,12 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	kNearest := make([]Contact, 0, k)
 	// To find the k closest contacts, we start looking from the bucket that the contact would be in
 	index := self.owner.GetKBucketFromID(&id)
-	if (index < 0) {
+	if index < 0 {
 		index = 0
 	}
 
 	// for all of these, need to check that the kbucket exists
-	if (self.kBuckets[index] != nil) {
+	if self.kBuckets[index] != nil {
 		self.owner.logger.Printf("Taking neighbor from non-nil bucket %d", index)
 		kNearest = append(kNearest, self.kBuckets[index].getAllContacts()...)
 	}
@@ -74,7 +74,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 		// 0th bucket never populated <--- this is wrong, 1 is between 2^0 and 2^1
 		for curr := index - 1; curr >= 0; curr-- {
 			currBucket := self.kBuckets[curr]
-			if (currBucket != nil) {
+			if currBucket != nil {
 				kNearest = append(kNearest, currBucket.getAllContacts()...)
 			}
 			if len(kNearest) >= k {
@@ -87,7 +87,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	if len(kNearest) < k {
 		for curr := index + 1; curr < 160; curr++ {
 			currBucket := self.kBuckets[curr]
-			if (currBucket != nil) {
+			if currBucket != nil {
 				self.owner.logger.Printf("Taking neighbor from non-nil bucket %d", curr)
 				kNearest = append(kNearest, currBucket.getAllContacts()...)
 			}
@@ -106,11 +106,11 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 
 	self.owner.logger.Printf("Finished sorting")
 	slice_index := k
-	if (len(kNearest) < k) {
+	if len(kNearest) < k {
 		slice_index = len(kNearest)
 	}
 	kNearest = kNearest[:slice_index]
-	
+
 	self.owner.logger.Printf("Found %d neighbors", len(kNearest))
 	return kNearest
 }
@@ -118,8 +118,8 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 func (self *RoutingTable) add(contact Contact) {
 	// Don't add yourself to the routing table under any circumstances
 	self_contact := Contact{self.owner.id, self.owner.addr}
-	self.owner.logger.Printf("My node ID: %s, other ID: %s", self.owner.id.Text(key_base), contact.Id.Text(key_base))
-	if (AreEqualContacts(&self_contact, &contact)) {
+	self.owner.logger.Printf("My node ID: %s, other ID: %s", self.owner.id.Text(keyBase), contact.Id.Text(keyBase))
+	if AreEqualContacts(&self_contact, &contact) {
 		return
 	}
 
@@ -147,7 +147,7 @@ func (self *RoutingTable) clear() {
 
 type KBucket struct {
 	contacts *list.List
-	k        int       // max number of contacts
+	k        int        // max number of contacts
 	lruCache *list.List // not implemented yet but explained in section 4.1
 	mu       *sync.Mutex
 }
@@ -155,7 +155,7 @@ type KBucket struct {
 func NewKBucket(k int) *KBucket {
 	contacts := list.New()
 	lruCache := list.New()
-	mu		:= &sync.Mutex{}
+	mu := &sync.Mutex{}
 	kBucket := KBucket{contacts, k, lruCache, mu}
 	return &kBucket
 }
