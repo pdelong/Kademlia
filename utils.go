@@ -7,7 +7,22 @@ import (
 	"net"
 )
 
+func RemoveDupesFromShortlist(contacts []Contact) []Contact {
+	// make a map from the list
+	undupe_map := make(map[string]Contact)
+	for i := 0; i < len(contacts); i++ {
+		curr := contacts[i]
+		undupe_map[curr.Addr.String()] = curr
+	}
 
+	// reconvert to slice
+	unduped_slice := make([]Contact, 0, len())
+	for key, value := range undupe_map {
+		unduped_slice = append(unduped_slice, value)
+	}
+
+	return unduped_slice
+}
 
 // GetKBucketFromAddr returns the KBucket that would contain destAddr
 func (node *Node) GetKBucketFromAddr(destAddr net.TCPAddr) int {
