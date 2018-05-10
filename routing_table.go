@@ -64,7 +64,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	}
 
 	// for all of these, need to check that the kbucket exists
-	if (self.kBuckets[index] != nil) {
+	if self.kBuckets[index] != nil {
 		kNearest = append(kNearest, self.kBuckets[index].getAllContacts()...)
 	}
 
@@ -86,7 +86,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	if len(kNearest) < k {
 		for curr := index + 1; curr < 160; curr++ {
 			currBucket := self.kBuckets[curr]
-			if (currBucket != nil) {
+			if currBucket != nil {
 				kNearest = append(kNearest, currBucket.getAllContacts()...)
 			}
 			if len(kNearest) >= k {

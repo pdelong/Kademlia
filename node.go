@@ -145,10 +145,10 @@ func (node *Node) FindNode(args FindNodeArgs, reply *FindNodeReply) error {
 	}
 	node.rt.add(*contact)
 
-	key_int := new(big.Int)
-	key_int.SetString(args.Key, keyBase)
+	keyInt := new(big.Int)
+	keyInt.SetString(args.Key, keyBase)
 
-	nearest := node.rt.findKNearestContacts(*key_int)
+	nearest := node.rt.findKNearestContacts(*keyInt)
 	*reply = FindNodeReply{Contacts: nearest}
 	node.logger.Printf("Processed FindNode from %s", args.Source.String())
 	return nil
