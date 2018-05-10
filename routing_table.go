@@ -3,7 +3,7 @@ package kademlia
 import (
 	"container/list"
 	"crypto/sha1"
-	//"fmt"
+	"fmt"
 	"math/big"
 	"net"
 	"sort"
@@ -38,14 +38,12 @@ type RoutingTable struct {
 	owner        *Node
 	kBuckets     []*KBucket
 	numNeighbors int
-	mu           *sync.Mutex
 }
 
 func NewRoutingTable(owner *Node) *RoutingTable {
 	kBuckets := make([]*KBucket, 160)
 	numNeighbors := 0
-	mu := &sync.Mutex{}
-	rt := RoutingTable{owner, kBuckets, numNeighbors, mu}
+	rt := RoutingTable{owner, kBuckets, numNeighbors}
 	return &rt
 }
 
@@ -126,11 +124,12 @@ func (self *RoutingTable) add(contact Contact) {
 	}
 
 	index := self.owner.GetKBucketFromAddr(contact.Addr)
-	self.owner.logger.Printf("Adding node to bucket %d", index)
 	if self.kBuckets[index] == nil {
 		self.owner.logger.Printf("Creating bucket %d", index)
-		self.kBuckets[index] = NewKBucket(20)
+		self.kBuckets[index] = NewKBucket(k)
 	}
+	self.owner.logger.Printf("Trying to put node %s in bucket %d", contact.Addr.String(), index)
+
 	self.kBuckets[index].addContact(contact)
 	//TODO: handle failure to add
 }
@@ -150,17 +149,21 @@ type KBucket struct {
 	contacts *list.List
 	k        int       // max number of contacts
 	lruCache *list.List // not implemented yet but explained in section 4.1
+	mu       *sync.Mutex
 }
 
 func NewKBucket(k int) *KBucket {
 	contacts := list.New()
 	lruCache := list.New()
-	kBucket := KBucket{contacts, k, lruCache}
+	mu		:= &sync.Mutex{}
+	kBucket := KBucket{contacts, k, lruCache, mu}
 	return &kBucket
 }
 
 // If bucket contains contact, returns ptr to element in list. Else, returns nil
 func (self *KBucket) getFromList(contact Contact) *list.Element {
+	self.mu.Lock()
+	defer self.mu.Unlock()
 	for e := self.contacts.Front(); e != nil; e = e.Next() {
 		curr, _ := e.Value.(Contact)
 		// TODO: handle error when element can't be cast to Contact
@@ -173,6 +176,8 @@ func (self *KBucket) getFromList(contact Contact) *list.Element {
 
 // Not nice, but need this functionality because contacts are a list
 func (self *KBucket) getAllContacts() []Contact {
+	self.mu.Lock()
+	defer self.mu.Unlock()
 	contacts := make([]Contact, 0, 20)
 	for e := self.contacts.Front(); e != nil; e = e.Next() {
 		curr, _ := e.Value.(Contact)
@@ -185,13 +190,17 @@ func (self *KBucket) getAllContacts() []Contact {
 func (self *KBucket) addContact(contact Contact) bool {
 	// If contact exists, move to tail
 	element := self.getFromList(contact)
+	self.mu.Lock()
+	defer self.mu.Unlock()
 	if element != nil {
+		fmt.Println("Moving node in bucket")
 		self.contacts.MoveToFront(element)
 		return true
 	} else {
 		// If bucket isn't full, add to tail
 		// list.Len() = O(1)
 		if self.contacts.Len() < self.k {
+			fmt.Println("Adding node to bucket")
 			self.contacts.PushFront(contact)
 			return true
 		}
@@ -240,6 +249,8 @@ func (table *RoutingTable) ContactFromID(id big.Int) *Contact {
 
 // Returns true if contact exists, false otherwise
 func (self *KBucket) removeContact(contact Contact) bool {
+	self.mu.Lock()
+	defer self.mu.Unlock()
 	element := self.getFromList(contact)
 	if element != nil {
 		self.contacts.Remove(element)
