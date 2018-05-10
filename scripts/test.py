@@ -30,6 +30,8 @@ from docopt import docopt
 import sys
 import os
 import random
+import binascii
+import hashlib
 
 def get_distribution(arguments, keys):
     if arguments['--zipf'] is not None:
@@ -43,6 +45,9 @@ def get_distribution(arguments, keys):
 
     return distribution
 
+def key_to_id(key):
+    return binascii.hexlify(hashlib.sha1(str(key).encode('utf-8')).digest())
+
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Kademlia Test Script 0.1')
@@ -55,8 +60,10 @@ if __name__ == '__main__':
     if arguments['store']:
         print("Attempting store")
 
-        key = arguments['<key>']
-        value = sys.stdin.buffer.read()
+        key = key_to_id(arguments['<key>'])
+        value = sys.stdin.read()
+
+        print("Storing key as {}".format(key))
 
         node.store(key, value)
     elif arguments['ping']:
@@ -74,11 +81,12 @@ if __name__ == '__main__':
         node.shutdown()
     elif arguments['table']:
         print("Retrieving list of all keys on node")
-        node.table()
+        for key, value in node.table().items():
+            print("Key: {}, Value: {}, isOrigin: {}".format(key, value['value'], value['isOrigin']))
     elif arguments['test']:
         nodes = [KademliaNode(addr) for addr in arguments['<nodes>']]
         num_keys = int(arguments['--keys'])
-        keys = list(range(num_keys))
+        keys = [key_to_id(key) for key in range(num_keys)]
         distribution = get_distribution(arguments, keys)
         size = int(arguments['--size'])
 
@@ -106,4 +114,7 @@ if __name__ == '__main__':
 
             if value != values[key]:
                 print("Value returned for {} but did not equal expected value".format(key))
+                print("{} vs {}".format(value, values[key]))
+            else:
+                print("Correct value returned!")
 

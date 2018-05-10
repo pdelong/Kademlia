@@ -26,6 +26,9 @@ class KademliaNode:
     def store_here(self, key, value):
         requests.post("http://{}/store_here/{}".format(self.address, key), data=value)
 
+    def store(self, key, value):
+        requests.post("http://{}/store/{}".format(self.address, key), data=value)
+
     def ping(self, target, byid):
         if byid:
             method = "id"
@@ -57,7 +60,7 @@ class KademliaNode:
             addr = entry['Addr']
             print("%x %s"%(key, addr))
 
-    def findvalue(self, key, oneshot=True):
+    def findvalue(self, key, oneshot=False):
         if oneshot:
             method = "oneshot"
         else:
@@ -66,8 +69,8 @@ class KademliaNode:
         url = "http://{}/{}/findvalue/{}".format(self.address, method, key)
 
         r = requests.get(url)
-        value = json.loads(r.text)
-        print("Got value back: ", value)
+
+        return base64.b64decode(json.loads(r.text))
 
     def table(self):
         r = requests.get("http://{}/table".format(self.address))

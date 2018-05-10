@@ -23,6 +23,10 @@ func (node *Node) doIterativeStore(key string, value []byte) {
 }
 
 func (node *Node) doIterativeFindValue(key string) []byte {
+	value, found := node.ht.get(key)
+	if found {
+		return value
+	}
 	//Iterations continue until no contacts returned that are closer or if all contacts in shortlist are active (k contacts have been queried)
 	toFindID := new(big.Int)
 	toFindID.SetString(key, keyBase)
