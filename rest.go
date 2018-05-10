@@ -144,7 +144,7 @@ func (node *Node) handleOneshotFindNode(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id := r.URL.Path[len("/iterative/findnode/"):]
+	id := r.URL.Path[len("/oneshot/findnode/"):]
 
 	// TODO: Check for valid id
 	// TODO: Perform necessary stuff
