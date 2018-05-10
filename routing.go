@@ -111,7 +111,7 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 			}
 
 			updatedShortlist = append(updatedShortlist, s...)
-			node.logger.Printf("Update: list length: %d\n", len(updatedShortlist))
+			updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
 				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
@@ -141,6 +141,7 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 			}
 			responseShortlist := node.findNodeToK(toFindID, sendingTo)
 			updatedShortlist = append(updatedShortlist, responseShortlist...)
+			updatedShortlist = RemoveDupesFromShortlist(updatedShortlist)
 			// update the shortlist
 			sort.Slice(updatedShortlist, func(i, j int) bool {
 				iDist := distanceBetween(*toFindID, updatedShortlist[i].Id)
