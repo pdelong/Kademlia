@@ -21,7 +21,7 @@ const tRepublish = 86400 * time.Second
 const alpha = 3
 
 // k is the maximum number of contacts stored in a bucket
-const k = 20
+const k = 4
 
 // keys should be stored as hex when in string form
 const keyBase = 16

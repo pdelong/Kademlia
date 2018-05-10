@@ -62,7 +62,9 @@ if __name__ == '__main__':
     elif arguments['ping']:
         pass
     elif arguments['findnode']:
-        pass
+        id = arguments['<target>']
+        print("Going to find node with id: {}".format(id))
+        node.findnode(id, "iterative")
     elif arguments['findvalue']:
         pass
     elif arguments['shutdown']:

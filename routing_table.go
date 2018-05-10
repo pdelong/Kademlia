@@ -3,7 +3,7 @@ package kademlia
 import (
 	"container/list"
 	"crypto/sha1"
-	"fmt"
+	//"fmt"
 	"math/big"
 	"net"
 	"sort"
@@ -64,8 +64,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	}
 
 	// for all of these, need to check that the kbucket exists
-	if self.kBuckets[index] != nil {
-		self.owner.logger.Printf("Taking neighbor from non-nil bucket %d", index)
+	if (self.kBuckets[index] != nil) {
 		kNearest = append(kNearest, self.kBuckets[index].getAllContacts()...)
 	}
 
@@ -87,8 +86,7 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 	if len(kNearest) < k {
 		for curr := index + 1; curr < 160; curr++ {
 			currBucket := self.kBuckets[curr]
-			if currBucket != nil {
-				self.owner.logger.Printf("Taking neighbor from non-nil bucket %d", curr)
+			if (currBucket != nil) {
 				kNearest = append(kNearest, currBucket.getAllContacts()...)
 			}
 			if len(kNearest) >= k {
@@ -104,7 +102,6 @@ func (self *RoutingTable) findKNearestContacts(id big.Int) []Contact {
 		return (aDist.Cmp(bDist) == -1)
 	})
 
-	self.owner.logger.Printf("Finished sorting")
 	slice_index := k
 	if len(kNearest) < k {
 		slice_index = len(kNearest)
@@ -193,14 +190,12 @@ func (self *KBucket) addContact(contact Contact) bool {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	if element != nil {
-		fmt.Println("Moving node in bucket")
 		self.contacts.MoveToFront(element)
 		return true
 	} else {
 		// If bucket isn't full, add to tail
 		// list.Len() = O(1)
 		if self.contacts.Len() < self.k {
-			fmt.Println("Adding node to bucket")
 			self.contacts.PushFront(contact)
 			return true
 		}

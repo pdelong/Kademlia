@@ -171,8 +171,9 @@ func (node *Node) handleIterativeFindNode(w http.ResponseWriter, r *http.Request
 	}
 
 	id := r.URL.Path[len("/iterative/findnode/"):]
-
+	fmt.Printf("Node got REST FindNode request for ID %s", id)
 	// TODO: Check for valid id
+	node.doIterativeFindNode(id)
 	// TODO: Perform necessary stuff
 	// TODO: Send back response
 	fmt.Fprintf(w, "Called FINDNODE for server %s", id)
