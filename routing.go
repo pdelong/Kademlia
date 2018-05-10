@@ -2,7 +2,6 @@ package kademlia
 
 import (
 	"math/big"
-	"net"
 	"sort"
 )
 
@@ -23,7 +22,7 @@ func (node *Node) doIterativeStore(key string, value []byte) {
 	}
 }
 
-func (node *Node) doIterativeFindValue(key string, dest net.TCPAddr) []byte {
+func (node *Node) doIterativeFindValue(key string) []byte {
 	//Iterations continue until no contacts returned that are closer or if all contacts in shortlist are active (k contacts have been queried)
 	toFindID := new(big.Int)
 	toFindID.SetString(key, keyBase)
