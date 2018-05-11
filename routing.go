@@ -3,6 +3,7 @@ package kademlia
 import (
 	"math/big"
 	"sort"
+	"sync"
 )
 
 // This file contains the iterative RPCs used for information progagation throughout nodes
@@ -27,11 +28,17 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 	if found {
 		return value
 	}
+
 	//Iterations continue until no contacts returned that are closer or if all contacts in shortlist are active (k contacts have been queried)
 	toFindID := new(big.Int)
 	toFindID.SetString(key, keyBase)
 	contacted := make(map[string]bool)
 	shortlist := make([]Contact, 0, k)
+	
+	// caching purposes
+	cache_contact := NewContact(node.addr);
+	cache_distance := distanceBetween(cache_contact.Id, *toFindID)
+	mu := &sync.Mutex{}
 
 	// add yourself to contacted
 	contacted[node.addr.String()] = true
@@ -65,16 +72,33 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 
 		// send alpha (or maybe fewer) RPCs
 		for i := 0; i < len(toSend); i++ {
-			toPing := toSend[i].Addr
-			go func() {
+			//toPing := toSend[i].Addr
+			go func(toSendContact Contact) {
+				toPing := toSendContact.Addr
 				response := node.doFindValue(key, toPing)
 				if response == nil {
 					// Error with performing doFindValue, ignoring for now
 					// TODO: Handle error (?)
 				} else if response.Val != nil {
+					// in this case, we found the value
+					node.logger.Printf("Got value from node %s at %s", toSendContact.Id.Text(keyBase), toSendContact.Addr.String())
+					if (caching_on) {
+						go node.doCacheDirect(*cache_contact, key, response.Val)
+					}	
 					valueChan <- response.Val
 					return
 				}
+
+				// we didn't find the value but got new contacts to search
+				// also save it if we want to cache on it
+				// check if it's closer to the destination
+				mu.Lock()
+				contacted_distance := distanceBetween(toSendContact.Id, *toFindID)
+				if (contacted_distance.Cmp(cache_distance) == -1) {
+					cache_contact = &toSendContact
+					cache_distance = contacted_distance
+				}
+				mu.Unlock()
 
 				responseShortlist := response.Contacts
 				contacted[toPing.String()] = true
@@ -90,7 +114,7 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 					sliceIndex = len(responseShortlist)
 				}
 				contactChan <- responseShortlist[:sliceIndex]
-			}()
+			}(toSend[i])
 		}
 
 		updatedShortlist := make([]Contact, len(shortlist), k)
@@ -144,7 +168,7 @@ func (node *Node) doIterativeFindValue(key string) []byte {
 					sendingTo = append(sendingTo, shortlist[i])
 				}
 			}
-			value, responseShortlist := node.findValueToK(toFindID, sendingTo)
+			value, responseShortlist := node.findValueToK(toFindID, sendingTo, cache_contact, cache_distance)
 			if value != nil {
 				return value
 			}
@@ -369,25 +393,38 @@ func (node *Node) findNodeToK(toFindID *big.Int, toSend []Contact) []Contact {
 	return updatedShortlist
 }
 
-func (node *Node) findValueToK(toFindID *big.Int, toSend []Contact) ([]byte, []Contact) {
+func (node *Node) findValueToK(toFindID *big.Int, toSend []Contact, cache_contact *Contact, cache_distance *big.Int) ([]byte, []Contact) {
+	mu := &sync.Mutex{}
 	contactChan := make(chan []Contact)
 	valueChan := make(chan []byte)
 
 	for i := 0; i < len(toSend); i++ {
-		toPing := toSend[i].Addr
-		go func() {
+		//toPing := toSend[i].Addr
+		go func(toSendContact Contact) {
+			toPing := toSendContact.Addr
 			response := node.doFindValue(toFindID.Text(keyBase), toPing)
 			if response == nil {
 				// Error with performing doFindValue, ignoring for now
 				// TODO: Handle error (?)
 			} else if response.Val != nil {
+				node.logger.Printf("Got value from node %s at %s", toSendContact.Id.Text(keyBase), toSendContact.Addr.String())
+				if (caching_on) {
+					go node.doCacheDirect(*cache_contact, toFindID.Text(keyBase), response.Val)
+				}
 				valueChan <- response.Val
 				return
 			}
+			mu.Lock()
+			contacted_distance := distanceBetween(toSendContact.Id, *toFindID)
+			if (contacted_distance.Cmp(cache_distance) == -1) {
+				cache_contact = &toSendContact
+				cache_distance = contacted_distance
+			}
+			mu.Unlock()
 
 			responseShortlist := response.Contacts
 			contactChan <- responseShortlist
-		}()
+		}(toSend[i])
 	}
 
 	// Wait for all rpcs to return
@@ -415,4 +452,13 @@ func (node *Node) findValueToK(toFindID *big.Int, toSend []Contact) ([]byte, []C
 	}
 
 	return nil, updatedShortlist
+}
+
+func (node *Node) doCacheDirect(contact Contact, key string, value []byte) {
+	node.logger.Printf("Caching on node %s", contact.Addr.String())
+	args := StoreArgs{node.addr, key, value}
+	var reply StoreReply
+	if !node.doRPC("Store", contact.Addr, args, &reply) {
+		return
+	}
 }

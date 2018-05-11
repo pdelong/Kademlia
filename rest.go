@@ -91,7 +91,7 @@ func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(value)
-	node.logger.Printf("Received STORE for key: (%s), value: (%s)", key, encoded)
+	node.logger.Printf("Received REST STORE for key: (%s), value: (%s)", key, encoded)
 
 	closest := node.doIterativeFindNode(key)
 	// TODO: Check that we have a node that is the closest
