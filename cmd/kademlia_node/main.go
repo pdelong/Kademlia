@@ -37,9 +37,6 @@ func main() {
 
 	addr := args[0]
 
-	//if len(args) >= 2 {
-	//	bootstrapAddr = args[1]
-	//}
 	// if this isn't a bootstrap node, read from a list of nodes in the system
 	bootstrapAddr := ""
 	if args[1] == "nb" {

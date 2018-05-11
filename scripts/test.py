@@ -32,7 +32,7 @@ import os
 import random
 import binascii
 import hashlib
-import time
+import timeit
 
 def get_distribution(arguments, keys):
     if arguments['--zipf'] is not None:
@@ -112,7 +112,11 @@ if __name__ == '__main__':
         for i in range(int(arguments['--times'])):
             key = distribution.next()
             node = random.choice(nodes)
+
+            start = timeit.default_timer()
             value = node.findvalue(key)
+            end = timeit.default_timer()
+            print("timespan: {}".format(end-start))
 
             if value != values[key]:
                 print("Value returned for {} but did not equal expected value".format(key))

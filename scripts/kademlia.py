@@ -7,18 +7,6 @@ import base64
 import json
 
 
-# with Stopwatch():
-#     pass
-class Stopwatch:
-    def __enter__(self):
-        self.start = time.clock()
-        return self
-
-    def __exit__(self, *args):
-        interval = time.clock() - self.start
-        print("timespan: {}".format(interval))
-
-
 class KademliaNode:
     def __init__(self, address):
         self.address = address
