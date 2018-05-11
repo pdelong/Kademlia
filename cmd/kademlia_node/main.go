@@ -8,11 +8,13 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"io/ioutil"
 	"time"
 )
 
 // path to bootstrap_nodes
 const bootstrap_node_path = "/home/pdelong/go/src/github.com/peterdelong/kademlia/cmd/kademlia_node/bootstrap_nodes"
+
 func checkIOError(e error) {
 	if e != nil && e != io.EOF {
 		log.Fatal(e)
@@ -53,6 +55,12 @@ func main() {
 		}
 
 		fmt.Println("Contacting ", bootstrapAddr)
+	}
+
+	// Disable logging if necessary (see option in globals.go)
+	if !loggingEnable {
+		log.SetOutput(ioutil.Discard)
+		log.SetFlags(0)
 	}
 
 	node := kademlia.NewNode(addr)

@@ -51,7 +51,6 @@ def key_to_id(key):
 
 
 if __name__ == '__main__':
-    time.sleep(30)
     arguments = docopt(__doc__, version='Kademlia Test Script 0.1')
     print(arguments)
 
@@ -71,13 +70,14 @@ if __name__ == '__main__':
     elif arguments['ping']:
         pass
     elif arguments['findnode']:
-        key = arguments['<target>']
+        key = key_to_id(arguments['<target>'])
         print("Going to find node with id: {}".format(key))
         node.findnode(key, arguments['oneshot'])
     elif arguments['findvalue']:
-        key = arguments['<target>']
+        key = key_to_id(arguments['<target>'])
         print("Looking for value with id: {}".format(key))
-        node.findvalue(key, arguments['oneshot'])
+        value = node.findvalue(key, arguments['oneshot'])
+        print("Got value: {}".format(value))
     elif arguments['shutdown']:
         print("Attempting to shut down node")
         node.shutdown()
@@ -109,7 +109,6 @@ if __name__ == '__main__':
         for key, value in storage_node.table().items():
             print("{}: {}".format(key, value))
 
-        time.sleep(30)
         for i in range(int(arguments['--times'])):
             key = distribution.next()
             node = random.choice(nodes)

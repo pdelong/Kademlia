@@ -26,3 +26,6 @@ const k = 4
 // keys should be stored as hex when in string form
 const keyBase = 16
 
+
+// Turn logging on and off
+const loggingEnable = false
