@@ -13,7 +13,6 @@ import (
 )
 
 // path to bootstrap_nodes
-const bootstrap_node_path = "/home/pdelong/go/src/github.com/peterdelong/kademlia/cmd/kademlia_node/bootstrap_nodes"
 
 func checkIOError(e error) {
 	if e != nil && e != io.EOF {
@@ -41,7 +40,7 @@ func main() {
 	bootstrapAddr := ""
 	if args[1] == "nb" {
 		if len(args) < 3 {
-			file, err := os.Open(bootstrap_node_path)
+			file, err := os.Open(kademlia.Bootstrap_node_path)
 			checkIOError(err)
 			reader := bufio.NewReader(file)
 			bootstrapAddrBytes, _, err := reader.ReadLine()
@@ -55,7 +54,7 @@ func main() {
 	}
 
 	// Disable logging if necessary (see option in globals.go)
-	if !loggingEnable {
+	if !kademlia.LoggingEnable {
 		log.SetOutput(ioutil.Discard)
 		log.SetFlags(0)
 	}

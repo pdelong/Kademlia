@@ -26,6 +26,10 @@ const k = 4
 // keys should be stored as hex when in string form
 const keyBase = 16
 
+// turn caching on and off
+const caching_on = true
 
 // Turn logging on and off
-const loggingEnable = false
+const LoggingEnable = false
+
+const Bootstrap_node_path = "/home/pdelong/go/src/github.com/peterdelong/kademlia/cmd/kademlia_node/bootstrap_nodes"
