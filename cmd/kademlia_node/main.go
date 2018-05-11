@@ -25,7 +25,7 @@ func checkIOError(e error) {
 func main() {
 	s1 := rand.NewSource(time.Now().UnixNano())
 	r1 := rand.New(s1)
-	num := r1.Intn(100)
+	num := r1.Intn(1000)
 	time.Sleep(time.Duration(num) * time.Millisecond)
 
 	args := os.Args[1:]
