@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"io/ioutil"
 	"time"
 )
 
@@ -51,12 +50,6 @@ func main() {
 		}
 
 		fmt.Println("Contacting ", bootstrapAddr)
-	}
-
-	// Disable logging if necessary (see option in globals.go)
-	if !kademlia.LoggingEnable {
-		log.SetOutput(ioutil.Discard)
-		log.SetFlags(0)
 	}
 
 	node := kademlia.NewNode(addr)

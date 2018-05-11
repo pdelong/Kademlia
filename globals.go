@@ -30,6 +30,6 @@ const keyBase = 16
 const caching_on = true
 
 // Turn logging on and off
-const LoggingEnable = false
+const loggingEnable = false
 
 const Bootstrap_node_path = "/home/pdelong/go/src/github.com/peterdelong/kademlia/cmd/kademlia_node/bootstrap_nodes"

@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"net"
@@ -188,7 +189,14 @@ func NewNode(address string) *Node {
 	// TODO: take in k and tRefresh arguments - for now just hardcoding default
 	node.rt = NewRoutingTable(node)
 
-	node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	// Disable logging if necessary (see option in globals.go)
+	if !loggingEnable {
+		log.SetOutput(ioutil.Discard)
+		log.SetFlags(0)
+		node.logger = log.New(ioutil.Discard, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	} else {
+		node.logger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
 
 	node.ht = *NewKVStore()
 

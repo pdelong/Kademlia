@@ -105,22 +105,26 @@ if __name__ == '__main__':
             storage_node.store(key, value)
 
         table = storage_node.table()
-        print(table)
-        for key, value in storage_node.table().items():
-            print("{}: {}".format(key, value))
+        #print(table)
+        #for key, value in storage_node.table().items():
+        #    print("{}: {}".format(key, value))
 
         for i in range(int(arguments['--times'])):
             key = distribution.next()
             node = random.choice(nodes)
 
             start = timeit.default_timer()
-            value = node.findvalue(key)
+            try:
+                value = node.findvalue(key)
+            except:
+                print("issue connecting")
             end = timeit.default_timer()
-            print("timespan: {}".format(end-start))
+            print("timespan {} {}".format(key, end-start))
 
-            if value != values[key]:
-                print("Value returned for {} but did not equal expected value".format(key))
-                print("{} vs {}".format(value, values[key]))
-            else:
-                print("Correct value returned!")
+
+#            if value != values[key]:
+#                print("Value returned for {} but did not equal expected value".format(key))
+#                print("{} vs {}".format(value, values[key]))
+#            else:
+#                print("Correct value returned!")
 
