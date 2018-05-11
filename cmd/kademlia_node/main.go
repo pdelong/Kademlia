@@ -13,6 +13,7 @@ import (
 
 // path to bootstrap_nodes
 const bootstrap_node_path = "/home/pdelong/go/src/github.com/peterdelong/kademlia/cmd/kademlia_node/bootstrap_nodes"
+
 func checkIOError(e error) {
 	if e != nil && e != io.EOF {
 		log.Fatal(e)
@@ -35,9 +36,6 @@ func main() {
 
 	addr := args[0]
 
-	//if len(args) >= 2 {
-	//	bootstrapAddr = args[1]
-	//}
 	// if this isn't a bootstrap node, read from a list of nodes in the system
 	bootstrapAddr := ""
 	if args[1] == "nb" {
