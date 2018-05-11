@@ -6,7 +6,9 @@ import (
 	"github.com/peterdelong/kademlia"
 	"io"
 	"log"
+	"math/rand"
 	"os"
+	"time"
 )
 
 // path to bootstrap_nodes
@@ -19,6 +21,11 @@ func checkIOError(e error) {
 
 // usage: kademlia_node <node_addr> [bootstrap_addr]
 func main() {
+	s1 := rand.NewSource(time.Now().UnixNano())
+	r1 := rand.New(s1)
+	num := r1.Intn(100)
+	time.Sleep(time.Duration(num) * time.Millisecond)
+
 	args := os.Args[1:]
 
 	if len(args) < 2 {
