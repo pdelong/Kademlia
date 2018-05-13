@@ -21,15 +21,15 @@ const tRepublish = 86400 * time.Second
 const alpha = 3
 
 // k is the maximum number of contacts stored in a bucket
-const k = 4
+const k = 8
 
 // keys should be stored as hex when in string form
-const keyBase = 16
+const keyBase = 1
 
 // turn caching on and off
 const caching_on = true
 
 // Turn logging on and off
-const loggingEnable = false
+const loggingEnable = true
 
 const Bootstrap_node_path = "/home/pdelong/go/src/github.com/peterdelong/kademlia/cmd/kademlia_node/bootstrap_nodes"

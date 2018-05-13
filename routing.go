@@ -300,6 +300,7 @@ func (node *Node) doIterativeFindNode(key string) []Contact {
 				sliceIndex = len(updatedShortlist)
 			}
 			updatedShortlist = updatedShortlist[:sliceIndex]
+
 		}
 
 		node.logger.Printf("Finished reading from channel")

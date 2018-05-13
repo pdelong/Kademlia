@@ -1,6 +1,7 @@
 package kademlia
 
 import (
+	"bufio"
 	"crypto/sha1"
 	"errors"
 	"fmt"
@@ -200,6 +201,8 @@ func NewNode(address string) *Node {
 
 	node.ht = *NewKVStore()
 
+	fmt.Println(caching_on)
+
 	return node
 }
 
@@ -242,6 +245,15 @@ func (node *Node) Run(toPing string) {
 		return
 	}
 
+	// write our address into the bootstrap node file
+	f, err := os.OpenFile(Bootstrap_node_path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if (err != nil) {
+		log.Fatal(err)
+	}
+	w := bufio.NewWriter(f)
+	fmt.Fprintln(w, node.addr.String())
+	w.Flush()
+	f.Close()
 	http.Serve(l, nil)
 }
 

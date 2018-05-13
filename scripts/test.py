@@ -8,7 +8,7 @@ Usage:
     test.py <addr> findvalue (iterative | oneshot) <target>
     test.py <addr> shutdown
     test.py <addr> table
-    test.py test [--zipf <alpha> | --uniform | --linear <m>] [--times <times>] [--keys <keys>] [--size <size>] <nodes>...
+    test.py test [--zipf <alpha> | --uniform | --linear <m>] [--times <times>] [--keys <keys>] [--size <size>] [--storeonly | --retrieveonly ] <nodes>...
     test.py (-h | --help)
     test.py --version
 
@@ -19,6 +19,8 @@ Usage:
         --size <size>               How large to make the values (in bytes) [default: 128]
         -t --times <times>          Number of times to test [default: 100]
         -n --keys <keys>            Number of keys to insert [default: 1000]
+        --storeonly                 Only store the keys, don't attempt to retrieve (for testing in parallel)
+        --retrieveonly              Only retrieve the keys, don't store them (for testing in parallel)
         -h --help                   Show this screen
         --version                   Show version
         -v                          Show extra debug information
@@ -36,6 +38,7 @@ import timeit
 
 def get_distribution(arguments, keys):
     if arguments['--zipf'] is not None:
+        print("Using alpha", int(arguments['--zipf']))
         distribution = Zipf(keys, int(arguments['--zipf']))
     elif arguments['--uniform']:
         distribution = Uniform(keys)
@@ -100,26 +103,28 @@ if __name__ == '__main__':
         print('Using {} as the main node for storage setup'.format(storage_node.address))
 
         # Store values on the appropriate nodes
-        for key, value in values.items():
-            print("Storing {}".format(key))
-            storage_node.store(key, value)
+        if not arguments['--retrieveonly']:
+            for key, value in values.items():
+                print("Storing {}".format(key))
+                storage_node.store(key, value)
 
-        table = storage_node.table()
+        #table = storage_node.table()
         #print(table)
         #for key, value in storage_node.table().items():
         #    print("{}: {}".format(key, value))
 
-        for i in range(int(arguments['--times'])):
-            key = distribution.next()
-            node = random.choice(nodes)
+        if not arguments['--storeonly']:
+            for i in range(int(arguments['--times'])):
+                key = distribution.next()
+                node = random.choice(nodes)
 
-            start = timeit.default_timer()
-            try:
-                value = node.findvalue(key)
-            except:
-                print("issue connecting")
-            end = timeit.default_timer()
-            print("timespan {} {}".format(key, end-start))
+                start = timeit.default_timer()
+                try:
+                    value = node.findvalue(key)
+                except:
+                    print("issue connecting")
+                end = timeit.default_timer()
+                print("timespan {} {}".format(key, end-start))
 
 
 #            if value != values[key]:

@@ -5,11 +5,15 @@ if [ "$#" -ne 1 ] ; then
 fi
 
 ROOT=/home/pdelong/go/src/github.com/peterdelong/kademlia
-PORT=8000
+PORT=8003
+
+#remove all logs
+cd $ROOT/logs
+rm *
 
 # rebuild the project and save the bootstrap node's address
 cd $ROOT/cmd/kademlia_node
-echo $1:$PORT > bootstrap_nodes
+rm bootstrap_nodes
 go build
 
 # start up the bootstrap node and save the id for later
