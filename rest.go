@@ -95,7 +95,13 @@ func (node *Node) handleStore(w http.ResponseWriter, r *http.Request) {
 
 	closest := node.doIterativeFindNode(key)
 	// TODO: Check that we have a node that is the closest
-	node.doStore(key, value, closest[0].Addr)
+	var storeHere net.TCPAddr
+	if len(closest) > 0 {
+		storeHere = closest[0].Addr
+	} else {
+		storeHere = node.addr
+	}
+	node.doStore(key, value, storeHere)
 
 	fmt.Fprintf(w, "Successfully stored key (%s)", key)
 }
