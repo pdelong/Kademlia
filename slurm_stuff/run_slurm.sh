@@ -5,7 +5,7 @@ if [ "$#" -ne 1 ] ; then
 fi
 
 ROOT=/home/pdelong/go/src/github.com/peterdelong/kademlia
-PORT=8003
+PORT=8001
 
 #remove all logs
 cd $ROOT/logs

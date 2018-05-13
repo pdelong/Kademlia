@@ -38,12 +38,12 @@ import timeit
 
 def get_distribution(arguments, keys):
     if arguments['--zipf'] is not None:
-        print("Using alpha", int(arguments['--zipf']))
-        distribution = Zipf(keys, int(arguments['--zipf']))
+        print("Using alpha", float(arguments['--zipf']))
+        distribution = Zipf(keys, float(arguments['--zipf']))
     elif arguments['--uniform']:
         distribution = Uniform(keys)
     elif arguments['--linear'] is not None:
-        distribution = Linear(keys, int(arguments['--linear']))
+        distribution = Linear(keys, float(arguments['--linear']))
     else:
         distribution = Zipf(keys, 1)
 
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                 try:
                     value = node.findvalue(key)
                 except:
-                    print("issue connecting")
+                    print("issue connecting to {}".format(node.address))
                 end = timeit.default_timer()
                 print("timespan {} {}".format(key, end-start))
 
